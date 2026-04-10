@@ -195,7 +195,7 @@ Each registered user gets a subdomain under `dmpay.eth`:
 - **Registry node:** `keccak256(dmpay.eth namehash + keccak256(handle))`
 - **Resolver:** ENS Public Resolver (`0xF29100983E058B709F3D539b0c765937B804AC15`)
 - **Address record:** Set to user's wallet address
-- **Contenthash:** Set to IPFS CIDv1 after profile page is pinned
+- **Contenthash:** Set to IPFS via Pinata CIDv1 after profile page is pinned
 
 The `dmpay.eth` parent domain is managed by the DMpay deployer wallet. `DMPayRegistry` is approved via `setApprovalForAll` on the ENS registry, allowing it to create subdomains on behalf of the owner.
 
