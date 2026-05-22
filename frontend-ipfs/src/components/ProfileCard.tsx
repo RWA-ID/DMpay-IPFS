@@ -5,6 +5,7 @@ import { normalize } from 'viem/ens';
 import { isAddress, formatUnits, formatEther } from 'viem';
 import { Globe, AtSign, Code2, Send, Infinity as InfinityIcon, MessageCircle, ShieldCheck, ArrowRight } from 'lucide-react';
 import { Avatar } from './Avatar';
+import { ShareProfile } from './ShareProfile';
 import { DMPAY_DIRECT_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 
 export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
@@ -104,6 +105,10 @@ export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
             {String(description)}
           </p>
         )}
+
+        <div className="mt-6">
+          <ShareProfile idOrEns={ensName ?? address} displayName={ensName ?? undefined} />
+        </div>
       </header>
 
       {/* PRICING — Card layout (lifetime featured) */}
