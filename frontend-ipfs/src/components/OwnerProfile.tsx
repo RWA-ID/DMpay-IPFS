@@ -154,7 +154,8 @@ export function OwnerProfile({ address }: { address: `0x${string}` }) {
 
         <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr]">
           {/* ─────────── LEFT — STATS + SUPPORTERS ─────────── */}
-          <section className="px-6 sm:px-10 py-10 lg:border-r border-border-subtle">
+          <section className="px-6 sm:px-10 pt-10 pb-10 lg:border-r border-border-subtle">
+            <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted mb-5">Recent activity</div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-6 gap-x-4 pb-8 border-b border-border-subtle">
               <Stat label="Supporters" value={stats ? String(stats.uniqueSenders) : '—'} loading={!stats} />
               <Stat label="Payments" value={stats ? String(stats.payments) : '—'} loading={!stats} />
@@ -214,8 +215,8 @@ export function OwnerProfile({ address }: { address: `0x${string}` }) {
           </section>
 
           {/* ─────────── RIGHT — PRICING ─────────── */}
-          <aside className="bg-bg-elevated px-6 sm:px-10 py-10">
-            <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted mb-4">How people reach you</div>
+          <aside className="bg-bg-elevated px-6 sm:px-10 pt-10 pb-10">
+            <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted mb-5">How people reach you</div>
             {hasAnyPrice ? (
               <>
                 <div className="grid gap-3">

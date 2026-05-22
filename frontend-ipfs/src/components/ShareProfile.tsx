@@ -70,7 +70,7 @@ export function ShareProfile({
         target="_blank" rel="noreferrer"
         className="inline-flex items-center gap-2 bg-bg-elevated hover:bg-bg-hover border border-border-subtle rounded-full px-3 py-1.5 text-xs font-mono text-text-secondary hover:text-text-primary"
       >
-        <Share2 size={12} /> Share on X on X
+        <Share2 size={12} /> Share on X
       </a>
       {displayName && (
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted self-center ml-1">
