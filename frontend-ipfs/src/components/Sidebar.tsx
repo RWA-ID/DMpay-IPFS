@@ -1,13 +1,19 @@
-import { MessageSquare, Plus, Compass, Settings, HelpCircle } from 'lucide-react';
+import { MessageSquare, Plus, Compass, Settings, HelpCircle, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAccount, useEnsName } from 'wagmi';
 
 export function Sidebar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { address } = useAccount();
+  const { data: ensName } = useEnsName({ address });
 
   const isInbox = pathname === '/inbox' || pathname.startsWith('/c/');
   const isDiscover = pathname === '/discover';
   const isSettings = pathname === '/settings';
+  const isProfile = pathname.startsWith('/u/');
+
+  const profileTarget = ensName ?? address;
 
   return (
     <aside className="w-14 bg-bg-base flex flex-col items-center py-4 border-r border-border-subtle">
@@ -15,6 +21,9 @@ export function Sidebar() {
         <SidebarBtn icon={MessageSquare} active={isInbox} onClick={() => navigate('/inbox')} label="Inbox" />
         <SidebarBtn icon={Plus} onClick={() => navigate('/')} label="New chat" />
         <SidebarBtn icon={Compass} active={isDiscover} onClick={() => navigate('/discover')} label="Discover" />
+        {profileTarget && (
+          <SidebarBtn icon={User} active={isProfile} onClick={() => navigate(`/u/${profileTarget}`)} label="My profile" />
+        )}
       </nav>
       <div className="flex flex-col gap-2">
         <SidebarBtn icon={HelpCircle} onClick={() => window.open('https://github.com/RWA-ID/DMpay-Protocol', '_blank')} label="Docs" />

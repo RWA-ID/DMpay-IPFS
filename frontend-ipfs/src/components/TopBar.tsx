@@ -71,10 +71,14 @@ export function TopBar() {
                 {initializing ? 'Connecting…' : 'Connect XMTP'}
               </button>
             )}
-            <div className="flex items-center gap-2 bg-bg-elevated rounded-full pl-1 pr-3 py-1">
+            <button
+              onClick={() => navigate(`/u/${ensName ?? address}`)}
+              title="View my profile"
+              className="flex items-center gap-2 bg-bg-elevated hover:bg-bg-hover rounded-full pl-1 pr-3 py-1 transition-colors"
+            >
               <Avatar src={avatar || undefined} fallback={ensName?.[0] || address?.[2]} size={24} />
               <span className="text-sm text-text-primary">{ensName ?? `${address?.slice(0, 6)}…${address?.slice(-4)}`}</span>
-            </div>
+            </button>
           </>
         )}
         <ConnectButton showBalance={false} accountStatus="address" chainStatus="none" />
