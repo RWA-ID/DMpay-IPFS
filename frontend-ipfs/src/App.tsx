@@ -11,6 +11,7 @@ import { Landing } from './components/Landing';
 import { Profile } from './components/Profile';
 import { Settings } from './components/Settings';
 import { Inbox } from './components/Inbox';
+import { Discover } from './components/Discover';
 import { XmtpAutoInit } from './components/XmtpAutoInit';
 
 const queryClient = new QueryClient();
@@ -56,6 +57,7 @@ function Shell() {
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/u/:nameOrAddress" element={<Profile />} />
+            <Route path="/discover" element={<Discover />} />
             <Route path="/inbox" element={<Inbox />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/groups/new" element={<Placeholder title="Create paid group" />} />

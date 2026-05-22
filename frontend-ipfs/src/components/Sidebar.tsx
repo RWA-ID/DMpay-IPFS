@@ -6,7 +6,7 @@ export function Sidebar() {
   const { pathname } = useLocation();
 
   const isInbox = pathname === '/inbox' || pathname.startsWith('/c/');
-  const isHome = pathname === '/';
+  const isDiscover = pathname === '/discover';
   const isSettings = pathname === '/settings';
 
   return (
@@ -14,7 +14,7 @@ export function Sidebar() {
       <nav className="flex flex-col gap-2 flex-1">
         <SidebarBtn icon={MessageSquare} active={isInbox} onClick={() => navigate('/inbox')} label="Inbox" />
         <SidebarBtn icon={Plus} onClick={() => navigate('/')} label="New chat" />
-        <SidebarBtn icon={Compass} active={isHome} onClick={() => navigate('/')} label="Discover" />
+        <SidebarBtn icon={Compass} active={isDiscover} onClick={() => navigate('/discover')} label="Discover" />
       </nav>
       <div className="flex flex-col gap-2">
         <SidebarBtn icon={HelpCircle} onClick={() => window.open('https://github.com/RWA-ID/DMpay-Protocol', '_blank')} label="Docs" />

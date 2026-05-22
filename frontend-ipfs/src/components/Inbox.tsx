@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEnsName, useEnsAvatar } from 'wagmi';
 import { normalize } from 'viem/ens';
-import { Loader2, MessageSquare, Inbox as InboxIcon } from 'lucide-react';
+import { Loader2, MessageSquare, Inbox as InboxIcon, Zap, RefreshCw } from 'lucide-react';
 import type { Dm, DecodedMessage } from '@xmtp/browser-sdk';
 import { ConsentState } from '@xmtp/browser-sdk';
 import { useXmtpClient } from '../hooks/useXmtpClient';
@@ -18,6 +18,7 @@ export function Inbox() {
   const { client, init, initializing } = useXmtpClient();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -25,6 +26,7 @@ export function Inbox() {
     let cancelled = false;
     (async () => {
       try {
+        setError(null);
         await client.conversations.sync();
         await client.conversations.syncAll([
           ConsentState.Allowed, ConsentState.Unknown, ConsentState.Denied,
@@ -36,21 +38,18 @@ export function Inbox() {
           dms.map(async (dm) => {
             await dm.sync().catch(() => {});
             const msgs = await dm.messages().catch(() => [] as DecodedMessage<unknown>[]);
-            // Find the most recent text message for the preview
             const lastMessage = [...msgs].reverse().find((m) => typeof m.content === 'string') ?? msgs[msgs.length - 1] ?? null;
-            // Resolve peer Ethereum address from members
             let peerAddress: string | null = null;
             try {
               const members = await dm.members();
               const peer = members.find((m: any) => m.inboxId !== client.inboxId);
-              const eth = peer?.accountIdentifiers?.find((i: any) => i.identifierKind === 0 /* Ethereum */);
+              const eth = peer?.accountIdentifiers?.find((i: any) => i.identifierKind === 0);
               peerAddress = eth?.identifier ?? null;
             } catch { /* ignore */ }
             return { conversation: dm, peerAddress, lastMessage };
           })
         );
         if (cancelled) return;
-        // Sort by last message time desc
         enriched.sort((a, b) => Number((b.lastMessage?.sentAtNs ?? 0n) - (a.lastMessage?.sentAtNs ?? 0n)));
         setRows(enriched);
       } catch (e: any) {
@@ -59,45 +58,84 @@ export function Inbox() {
       }
     })();
     return () => { cancelled = true; };
-  }, [client]);
+  }, [client, reloadKey]);
 
   if (!client) {
     return (
       <main className="flex-1 flex flex-col items-center justify-center bg-bg-base text-center p-6">
-        <InboxIcon className="text-brand mb-3" size={28} />
-        <div className="text-text-primary font-medium mb-2">Connect to XMTP to see your inbox</div>
-        <button
-          onClick={() => init()}
-          disabled={initializing}
-          className="bg-brand hover:bg-brand-hover disabled:opacity-50 text-brand-ink rounded-2xl px-6 py-3 font-medium"
-        >
-          {initializing ? <span className="inline-flex items-center gap-2"><Loader2 className="animate-spin" size={16} /> Connecting…</span> : 'Connect XMTP'}
-        </button>
+        <div className="max-w-md">
+          <InboxIcon className="text-text-muted mb-4 mx-auto" size={28} />
+          <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">Step required</div>
+          <h2 className="dm-display text-3xl mt-2 text-text-primary">Connect to XMTP to read your inbox.</h2>
+          <p className="text-sm text-text-secondary mt-3">DMpay messages live on XMTP — end-to-end encrypted and portable. One signature unlocks your inbox in this browser.</p>
+          <button
+            onClick={() => init()}
+            disabled={initializing}
+            className="mt-6 bg-brand hover:bg-brand-hover disabled:opacity-50 text-brand-ink rounded-2xl px-6 py-3.5 font-medium inline-flex items-center gap-2"
+          >
+            {initializing
+              ? <><Loader2 className="animate-spin" size={16} /> Connecting…</>
+              : <><Zap size={16} /> Connect XMTP</>}
+          </button>
+        </div>
       </main>
     );
   }
 
   return (
     <main className="flex-1 overflow-y-auto bg-bg-base">
-      <div className="max-w-3xl mx-auto px-6 py-10">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-semibold text-text-primary">Inbox</h1>
-          <button onClick={() => navigate('/')} className="text-text-secondary hover:text-text-primary text-sm">+ New chat</button>
+      <div className="max-w-3xl mx-auto px-6 sm:px-10 pt-12 pb-16">
+        <div className="flex items-end justify-between flex-wrap gap-3">
+          <div>
+            <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">· Inbox</div>
+            <h1 className="dm-display text-4xl sm:text-5xl mt-2 text-text-primary">Your conversations</h1>
+            {rows && (
+              <p className="font-mono text-xs text-text-muted mt-2">
+                {rows.length} {rows.length === 1 ? 'thread' : 'threads'} · synced via XMTP
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setReloadKey(k => k + 1)}
+              className="font-mono text-xs text-text-muted hover:text-text-primary inline-flex items-center gap-1.5 border border-border-subtle rounded-full px-3 py-2"
+              title="Resync from network"
+            >
+              <RefreshCw size={12} /> Resync
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="bg-brand hover:bg-brand-hover text-brand-ink rounded-full px-4 py-2 text-sm font-medium"
+            >
+              + New chat
+            </button>
+          </div>
         </div>
-        {error && <div className="bg-bg-panel border border-red-500/30 text-red-300 rounded-2xl p-4 text-sm mb-4">{error}</div>}
-        {rows === null && (
-          <div className="flex items-center gap-2 text-text-secondary text-sm"><Loader2 className="animate-spin" size={14} /> Loading conversations…</div>
+
+        {error && (
+          <div className="mt-6 bg-bg-panel border border-danger/30 text-danger rounded-2xl p-4 text-sm">{error}</div>
         )}
-        {rows && rows.length === 0 && (
-          <div className="bg-bg-panel border border-border-subtle rounded-3xl p-10 text-center">
-            <MessageSquare className="text-brand mx-auto mb-3" size={24} />
-            <div className="text-text-primary font-medium mb-1">No conversations yet</div>
-            <div className="text-text-secondary text-sm mb-5">Search any ENS or wallet to start your first chat.</div>
-            <button onClick={() => navigate('/')} className="bg-brand hover:bg-brand-hover text-brand-ink rounded-2xl px-5 py-2.5 font-medium text-sm">Find someone</button>
+
+        {rows === null && (
+          <div className="mt-8 flex items-center gap-2 text-text-secondary text-sm font-mono">
+            <Loader2 className="animate-spin" size={14} /> Loading conversations…
           </div>
         )}
+
+        {rows && rows.length === 0 && (
+          <div className="mt-8 bg-bg-panel border border-border-subtle rounded-3xl p-10 text-center">
+            <MessageSquare className="text-text-muted mx-auto mb-3" size={24} />
+            <div className="text-text-primary font-medium mb-1">No conversations on this installation.</div>
+            <div className="text-text-secondary text-sm max-w-md mx-auto">
+              XMTP threads are bound to the installation that created them. If you revoked your previous installation,
+              older history won't reappear here — the messages still exist on-network for the other inboxId.
+            </div>
+            <button onClick={() => navigate('/')} className="mt-5 bg-brand hover:bg-brand-hover text-brand-ink rounded-2xl px-5 py-2.5 font-medium text-sm">Find someone</button>
+          </div>
+        )}
+
         {rows && rows.length > 0 && (
-          <div className="space-y-2">
+          <div className="mt-8 divide-y divide-border-subtle border-y border-border-subtle">
             {rows.map((r) => (
               <InboxRow key={r.conversation.id} row={r} onOpen={(addr) => navigate(`/c/${addr}`)} />
             ))}
@@ -114,22 +152,27 @@ function InboxRow({ row, onOpen }: { row: Row; onOpen: (addr: string) => void })
   const { data: avatar } = useEnsAvatar({ name: ensName ? safeNormalize(ensName) : undefined, query: { enabled: !!ensName } });
   const display = ensName ?? (peer ? `${peer.slice(0, 6)}…${peer.slice(-4)}` : 'Unknown peer');
   const preview = typeof row.lastMessage?.content === 'string' ? row.lastMessage.content : '';
+  const ts = row.lastMessage ? new Date(Number(row.lastMessage.sentAtNs / 1_000_000n)) : null;
+  const dateLabel = ts
+    ? (Date.now() - ts.getTime() < 24 * 3600_000
+        ? ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : ts.toLocaleDateString([], { month: 'short', day: 'numeric' }))
+    : '';
+
   return (
     <button
       onClick={() => peer && onOpen(peer)}
       disabled={!peer}
-      className="w-full bg-bg-panel hover:bg-bg-hover border border-border-subtle rounded-2xl p-4 flex items-center gap-3 text-left transition-colors disabled:opacity-50"
+      className="w-full py-4 flex items-center gap-4 text-left disabled:opacity-50 hover:bg-bg-elevated/40 transition-colors px-2 -mx-2 rounded-xl"
     >
-      <Avatar src={avatar || undefined} fallback={display[0]} size={44} />
+      <Avatar src={avatar || undefined} fallback={display[0]} size={48} />
       <div className="flex-1 min-w-0">
-        <div className="font-medium text-text-primary truncate">{display}</div>
-        <div className="text-sm text-text-secondary truncate">{preview || 'No messages yet'}</div>
-      </div>
-      {row.lastMessage && (
-        <div className="text-xs text-text-muted shrink-0">
-          {new Date(Number(row.lastMessage.sentAtNs / 1_000_000n)).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="font-mono text-[15px] font-medium text-text-primary truncate">{display}</span>
+          <span className="font-mono text-[11px] text-text-muted shrink-0">{dateLabel}</span>
         </div>
-      )}
+        <div className="text-sm text-text-secondary truncate mt-1">{preview || 'No messages yet'}</div>
+      </div>
     </button>
   );
 }

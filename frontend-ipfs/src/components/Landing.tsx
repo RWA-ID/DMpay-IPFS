@@ -3,9 +3,12 @@ import { isAddress } from 'viem';
 import { useAccount } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowRight, Wallet } from 'lucide-react';
+import { Search, ArrowRight, ShieldCheck, Lock, Coins, Zap } from 'lucide-react';
 import { ProfileCard } from './ProfileCard';
+import { HeroPreview } from './HeroPreview';
 import { Footer } from './Footer';
+
+const FEATURED_CREATOR = 'breilyn.eth';
 
 export function Landing() {
   const [query, setQuery] = useState('');
@@ -18,123 +21,79 @@ export function Landing() {
   const { openConnectModal } = useConnectModal();
   const navigate = useNavigate();
 
-  const primaryCta = () => (isConnected ? navigate('/settings') : openConnectModal?.());
+  const setPriceCta = () => (isConnected ? navigate('/settings') : openConnectModal?.());
+  const scrollToSearch = () => {
+    const el = document.getElementById('search');
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => document.getElementById('search-input')?.focus(), 350);
+  };
 
   return (
     <main className="flex-1 overflow-y-auto bg-bg-base">
       {/* ────────────── HERO ────────────── */}
-      <section className="max-w-6xl mx-auto px-6 sm:px-10 pt-14 pb-16">
-        <div className="grid grid-cols-1 lg:grid-cols-[1.25fr_1fr] gap-12 lg:gap-16 items-center">
-          {/* LEFT — editorial copy */}
+      <section className="max-w-6xl mx-auto px-6 sm:px-10 pt-14 pb-20">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_1fr] gap-10 lg:gap-14 items-center">
+          {/* LEFT — editorial copy (dominant) */}
           <div>
             <div className="inline-flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.14em] bg-chip text-chip-ink rounded-full px-3 py-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-success" />
               Live on Ethereum mainnet
             </div>
 
-            <h1 className="dm-display text-[64px] sm:text-[88px] mt-6 text-text-primary">
+            <h1 className="dm-display text-[64px] sm:text-[88px] lg:text-[104px] mt-6 text-text-primary">
               Your inbox<br />
               <span className="text-text-muted">is worth more</span><br />
               than zero.
             </h1>
 
-            <p className="text-lg text-text-secondary max-w-[520px] mt-7 leading-relaxed">
+            <p className="text-lg sm:text-xl text-text-secondary max-w-[560px] mt-7 leading-relaxed">
               DMpay turns your wallet into a paywall. Set a price in USDC or ETH —
-              fans pay to message you, join your group, or buy a lifetime pass.
-              Payments settle on-chain. No platform cut.
+              fans pay to message you or buy a lifetime pass. Payments settle on-chain. No platform cut.
             </p>
 
             <div className="flex flex-wrap gap-3 mt-8">
               <button
-                onClick={primaryCta}
+                onClick={setPriceCta}
                 className="bg-brand hover:bg-brand-hover text-brand-ink rounded-2xl px-6 py-4 font-medium inline-flex items-center gap-2"
               >
                 {isConnected ? 'Set your price' : 'Connect & set price'} <ArrowRight size={16} />
               </button>
-              <a
-                href="#discover"
-                className="bg-bg-panel hover:bg-bg-hover border border-border-strong text-text-primary rounded-2xl px-6 py-4 font-medium inline-flex items-center"
+              <button
+                onClick={() => navigate('/discover')}
+                className="bg-bg-panel hover:bg-bg-hover border border-border-strong text-text-primary rounded-2xl px-6 py-4 font-medium inline-flex items-center gap-2"
               >
-                Browse creators
-              </a>
-            </div>
-
-            <div className="flex items-center gap-5 mt-9">
-              <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">As featured on</div>
-              <div className="flex flex-wrap gap-5 text-sm text-text-muted">
-                <span>Bankless</span>
-                <span>Farcaster</span>
-                <span>Crypto Twitter</span>
-                <span>The Defiant</span>
-              </div>
+                <Search size={16} /> Discover creators
+              </button>
+              <button
+                onClick={scrollToSearch}
+                className="text-text-secondary hover:text-text-primary rounded-2xl px-2 py-4 font-medium inline-flex items-center gap-2 underline underline-offset-4 decoration-border-strong"
+              >
+                or search by ENS
+              </button>
             </div>
           </div>
 
-          {/* RIGHT — search + result, framed */}
-          <div className="relative">
-            <div className="absolute -inset-7 border border-border-subtle rounded-[28px] pointer-events-none" />
-            <div className="absolute -top-7 left-0 right-0 flex justify-center" style={{ transform: 'translateY(-50%)' }}>
+          {/* RIGHT — compact creator preview */}
+          <div className="relative max-w-[400px] w-full justify-self-center lg:justify-self-end">
+            <div className="absolute -inset-5 border border-border-subtle rounded-[24px] pointer-events-none" />
+            <div className="absolute -top-5 left-0 right-0 flex justify-center" style={{ transform: 'translateY(-50%)' }}>
               <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted bg-bg-base px-3 py-1">
-                · Find someone on DMpay ·
+                · A creator on DMpay ·
               </span>
             </div>
-
-            <div className="bg-bg-panel border border-border-subtle rounded-[18px] shadow-card p-5 sm:p-6">
-              <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted mb-3">Search ENS or address</div>
-              <div className="flex items-center bg-bg-elevated border border-border-subtle rounded-2xl pl-4 pr-3 py-2.5">
-                <Search size={18} className="text-text-muted shrink-0" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="vitalik.eth or 0x…"
-                  className="flex-1 bg-transparent text-text-primary placeholder:text-text-muted text-[15px] px-3 py-1.5 focus:outline-none font-mono"
-                />
-              </div>
-              {query && !valid && (
-                <div className="text-text-muted text-xs mt-3 font-mono">Type a full ENS name or 0x address.</div>
-              )}
-
-              {valid && (
-                <div className="mt-5">
-                  <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted mb-3">Result</div>
-                  <ProfileCard key={trimmed} nameOrAddress={trimmed} />
-                </div>
-              )}
-
-              {!valid && isConnected && address && (
-                <div className="mt-5">
-                  <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted mb-3">Your profile</div>
-                  <ProfileCard nameOrAddress={address} />
-                </div>
-              )}
-
-              {!valid && !isConnected && (
-                <div className="mt-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">· A creator on DMpay</div>
-                    <button
-                      onClick={() => openConnectModal?.()}
-                      className="inline-flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted hover:text-text-primary"
-                    >
-                      <Wallet size={12} /> Connect
-                    </button>
-                  </div>
-                  <ProfileCard nameOrAddress="breilyn.eth" />
-                </div>
-              )}
-            </div>
+            <HeroPreview ensName={FEATURED_CREATOR} />
           </div>
         </div>
       </section>
 
-      {/* ────────────── STATS STRIP ────────────── */}
+      {/* ────────────── TRUST STRIP (honest constants only) ────────────── */}
       <section className="border-t border-b border-border-subtle bg-bg-elevated">
         <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4">
           {[
-            { l: 'Settled on-chain', v: '$2.4M', s: 'in the last 30 days' },
-            { l: 'Active creators', v: '3,061', s: 'across 12 categories' },
+            { l: 'To creator', v: '97.5%', s: 'every payment, direct to wallet' },
             { l: 'Protocol fee', v: '2.5%', s: 'flat, immutable, on-chain' },
-            { l: 'Platform cut', v: '0%', s: 'everything else is yours' },
+            { l: 'Platform cut', v: '0%', s: 'no escrow, no custody' },
+            { l: 'Settlement', v: 'Atomic', s: 'one transaction, then a DM' },
           ].map((s, i) => (
             <div
               key={i}
@@ -148,38 +107,79 @@ export function Landing() {
         </div>
       </section>
 
-      {/* ────────────── HOW IT WORKS ────────────── */}
-      <section id="how-it-works" className="max-w-6xl mx-auto px-6 sm:px-10 py-20">
-        <div className="flex items-end justify-between mb-10 flex-wrap gap-4">
-          <div>
-            <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">How it works</div>
-            <h2 className="dm-display text-4xl sm:text-5xl mt-2 text-text-primary">Three steps. No middlemen.</h2>
+      {/* ────────────── SEARCH SECTION ────────────── */}
+      <section id="search" className="max-w-3xl mx-auto px-6 sm:px-10 pt-20 pb-10">
+        <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">Search</div>
+        <h2 className="dm-display text-4xl sm:text-5xl mt-2 text-text-primary">Find anyone on DMpay.</h2>
+        <p className="text-text-secondary mt-3 max-w-xl leading-relaxed">
+          Type an ENS name or 0x address. If they've set a price, you can pay to open an end-to-end encrypted DM.
+        </p>
+
+        <div className="mt-7 bg-bg-panel border border-border-subtle rounded-2xl p-5">
+          <div className="flex items-center bg-bg-elevated border border-border-subtle rounded-2xl pl-4 pr-3 py-2.5">
+            <Search size={18} className="text-text-muted shrink-0" />
+            <input
+              id="search-input"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="vitalik.eth or 0x…"
+              className="flex-1 bg-transparent text-text-primary placeholder:text-text-muted text-[15px] px-3 py-1.5 focus:outline-none font-mono"
+            />
           </div>
-          <a
-            href="https://etherscan.io/address/0xa204f8242A535979821d96093238B5ccC268631E"
-            target="_blank" rel="noreferrer"
-            className="font-mono text-xs text-text-muted hover:text-text-primary"
-          >
-            View contract on Etherscan →
-          </a>
+          {query && !valid && (
+            <div className="text-text-muted text-xs mt-3 font-mono">Type a full ENS name or 0x address.</div>
+          )}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            { n: '01', t: 'Set your price', d: 'Connect your wallet, pick USDC or ETH amounts for per-DM and lifetime tiers. Your ENS becomes your URL.' },
-            { n: '02', t: 'Share the link', d: 'dmpay.eth/u/yourname.eth — drop it in your X bio, Telegram, Lens. Fans tap, pay, message.' },
-            { n: '03', t: 'Get paid, talk back', d: 'Payment settles atomically: 97.5% to you, 2.5% protocol. Chat over end-to-end encrypted XMTP, portable anywhere.' },
-          ].map(s => (
-            <div key={s.n} className="bg-bg-panel border border-border-subtle rounded-2xl p-6">
-              <div className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-text-muted">{s.n}</div>
-              <div className="text-xl font-medium mt-3 text-text-primary">{s.t}</div>
-              <p className="text-sm text-text-secondary mt-2.5 leading-relaxed">{s.d}</p>
+
+        {valid && (
+          <div className="mt-6">
+            <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted mb-3">Result</div>
+            <ProfileCard key={trimmed} nameOrAddress={trimmed} />
+          </div>
+        )}
+
+        {!valid && isConnected && address && (
+          <div className="mt-6">
+            <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted mb-3">Your profile</div>
+            <ProfileCard nameOrAddress={address} />
+          </div>
+        )}
+      </section>
+
+      {/* ────────────── HOW IT WORKS ────────────── */}
+      <section id="how-it-works" className="border-t border-border-subtle">
+        <div className="max-w-6xl mx-auto px-6 sm:px-10 py-20">
+          <div className="flex items-end justify-between mb-10 flex-wrap gap-4">
+            <div>
+              <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">How it works</div>
+              <h2 className="dm-display text-4xl sm:text-5xl mt-2 text-text-primary">Three steps. No middlemen.</h2>
             </div>
-          ))}
+            <a
+              href="https://etherscan.io/address/0xa204f8242A535979821d96093238B5ccC268631E"
+              target="_blank" rel="noreferrer"
+              className="font-mono text-xs text-text-muted hover:text-text-primary"
+            >
+              View contract on Etherscan →
+            </a>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              { n: '01', t: 'Set your price', d: 'Connect your wallet, pick USDC or ETH amounts for per-DM and lifetime tiers. Your ENS becomes your URL.' },
+              { n: '02', t: 'Share the link', d: 'dmpay.eth/u/yourname.eth — drop it in your X bio, Telegram, Lens. Fans tap, pay, message.' },
+              { n: '03', t: 'Get paid, talk back', d: 'Payment settles atomically: 97.5% to you, 2.5% protocol. Chat over end-to-end encrypted XMTP, portable anywhere.' },
+            ].map(s => (
+              <div key={s.n} className="bg-bg-panel border border-border-subtle rounded-2xl p-6">
+                <div className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-text-muted">{s.n}</div>
+                <div className="text-xl font-medium mt-3 text-text-primary">{s.t}</div>
+                <p className="text-sm text-text-secondary mt-2.5 leading-relaxed">{s.d}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* ────────────── WHO IT'S FOR ────────────── */}
-      <section id="discover" className="border-t border-border-subtle">
+      <section className="border-t border-border-subtle">
         <div className="max-w-6xl mx-auto px-6 sm:px-10 py-20">
           <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">Built for</div>
           <h2 className="dm-display text-4xl sm:text-5xl mt-2 text-text-primary">People worth reaching.</h2>
@@ -217,7 +217,7 @@ export function Landing() {
           </div>
           <div className="flex flex-col gap-3 items-start">
             <button
-              onClick={primaryCta}
+              onClick={setPriceCta}
               className="bg-brand-ink text-brand hover:opacity-90 rounded-2xl px-6 py-4 font-medium inline-flex items-center gap-2 text-base"
             >
               {isConnected ? 'Set your price' : 'Connect & set price'} <ArrowRight size={16} />
@@ -231,3 +231,6 @@ export function Landing() {
     </main>
   );
 }
+
+// kept for type-checking; pretty icons still imported just in case
+void [ShieldCheck, Lock, Coins, Zap];
