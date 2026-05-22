@@ -1,0 +1,53 @@
+export const DMPAY_DIRECT_ADDRESS = '0xa204f8242A535979821d96093238B5ccC268631E' as const;
+export const USDC_ADDRESS = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as const;
+
+export const dmpayDirectAbi = [
+  { type: 'function', name: 'priceOf', stateMutability: 'view', inputs: [{ name: '', type: 'address' }], outputs: [
+    { name: 'usdc', type: 'uint256' },
+    { name: 'eth', type: 'uint256' },
+    { name: 'lifetimeUsdc', type: 'uint256' },
+    { name: 'lifetimeEth', type: 'uint256' },
+  ]},
+  { type: 'function', name: 'hasLifetimePass', stateMutability: 'view',
+    inputs: [{ name: 'recipient', type: 'address' }, { name: 'sender', type: 'address' }],
+    outputs: [{ type: 'bool' }] },
+  { type: 'function', name: 'setPrice', stateMutability: 'nonpayable',
+    inputs: [{ name: 'usdc', type: 'uint256' }, { name: 'eth', type: 'uint256' },
+             { name: 'lifetimeUsdc', type: 'uint256' }, { name: 'lifetimeEth', type: 'uint256' }],
+    outputs: [] },
+  { type: 'function', name: 'openConversationUSDC', stateMutability: 'nonpayable',
+    inputs: [{ name: 'recipient', type: 'address' }], outputs: [] },
+  { type: 'function', name: 'openConversationETH', stateMutability: 'payable',
+    inputs: [{ name: 'recipient', type: 'address' }], outputs: [] },
+  { type: 'function', name: 'payMessageUSDC', stateMutability: 'nonpayable',
+    inputs: [{ name: 'recipient', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [] },
+  { type: 'function', name: 'payMessageETH', stateMutability: 'payable',
+    inputs: [{ name: 'recipient', type: 'address' }], outputs: [] },
+  { type: 'function', name: 'buyLifetimePassUSDC', stateMutability: 'nonpayable',
+    inputs: [{ name: 'recipient', type: 'address' }], outputs: [] },
+  { type: 'function', name: 'buyLifetimePassETH', stateMutability: 'payable',
+    inputs: [{ name: 'recipient', type: 'address' }], outputs: [] },
+  { type: 'function', name: 'createGroup', stateMutability: 'nonpayable',
+    inputs: [{ name: 'priceUsdc', type: 'uint256' }, { name: 'priceEth', type: 'uint256' }, { name: 'capacity', type: 'uint64' }],
+    outputs: [{ name: 'id', type: 'uint256' }] },
+  { type: 'function', name: 'joinGroupUSDC', stateMutability: 'nonpayable',
+    inputs: [{ name: 'id', type: 'uint256' }], outputs: [] },
+  { type: 'function', name: 'joinGroupETH', stateMutability: 'payable',
+    inputs: [{ name: 'id', type: 'uint256' }], outputs: [] },
+  { type: 'function', name: 'setGroupXmtpId', stateMutability: 'nonpayable',
+    inputs: [{ name: 'id', type: 'uint256' }, { name: 'xmtpGroupId', type: 'bytes32' }], outputs: [] },
+  { type: 'function', name: 'closeGroup', stateMutability: 'nonpayable',
+    inputs: [{ name: 'id', type: 'uint256' }], outputs: [] },
+] as const;
+
+export const erc20Abi = [
+  { type: 'function', name: 'allowance', stateMutability: 'view',
+    inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }],
+    outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'approve', stateMutability: 'nonpayable',
+    inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }],
+    outputs: [{ type: 'bool' }] },
+  { type: 'function', name: 'balanceOf', stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'decimals', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] },
+] as const;
