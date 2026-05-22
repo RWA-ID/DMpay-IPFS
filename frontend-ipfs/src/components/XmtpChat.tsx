@@ -10,7 +10,7 @@ export function XmtpChat({ recipient, recipientName }: {
   recipientName: string;
 }) {
   const { client, init, initializing, error, revokeAndRetry, needsRevoke } = useXmtpClient();
-  const { address: me } = useAccount();
+  useAccount();
   const [conversation, setConversation] = useState<Dm<unknown> | null>(null);
   const [messages, setMessages] = useState<DecodedMessage<unknown>[]>([]);
   const [myInboxId, setMyInboxId] = useState<string | null>(null);

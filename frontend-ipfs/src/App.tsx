@@ -1,7 +1,7 @@
 import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { config } from './lib/wagmi';
 import { TopBar } from './components/TopBar';
 import { Sidebar } from './components/Sidebar';
@@ -26,9 +26,9 @@ function App() {
             borderRadius: 'medium',
           })}
         >
-          <BrowserRouter>
+          <HashRouter>
             <Shell />
-          </BrowserRouter>
+          </HashRouter>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
