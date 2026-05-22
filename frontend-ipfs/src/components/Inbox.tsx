@@ -69,7 +69,7 @@ export function Inbox() {
         <button
           onClick={() => init()}
           disabled={initializing}
-          className="bg-brand hover:bg-brand-hover disabled:opacity-50 text-white rounded-2xl px-6 py-3 font-medium"
+          className="bg-brand hover:bg-brand-hover disabled:opacity-50 text-brand-ink rounded-2xl px-6 py-3 font-medium"
         >
           {initializing ? <span className="inline-flex items-center gap-2"><Loader2 className="animate-spin" size={16} /> Connecting…</span> : 'Connect XMTP'}
         </button>
@@ -93,7 +93,7 @@ export function Inbox() {
             <MessageSquare className="text-brand mx-auto mb-3" size={24} />
             <div className="text-text-primary font-medium mb-1">No conversations yet</div>
             <div className="text-text-secondary text-sm mb-5">Search any ENS or wallet to start your first chat.</div>
-            <button onClick={() => navigate('/')} className="bg-brand hover:bg-brand-hover text-white rounded-2xl px-5 py-2.5 font-medium text-sm">Find someone</button>
+            <button onClick={() => navigate('/')} className="bg-brand hover:bg-brand-hover text-brand-ink rounded-2xl px-5 py-2.5 font-medium text-sm">Find someone</button>
           </div>
         )}
         {rows && rows.length > 0 && (

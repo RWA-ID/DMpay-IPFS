@@ -70,7 +70,7 @@ export function Settings() {
           <Coins className="text-brand mx-auto mb-4" size={32} />
           <h2 className="text-xl font-semibold text-text-primary mb-2">Connect to set up your profile</h2>
           <p className="text-text-secondary mb-6 text-sm">Your wallet signs prices on-chain. No backend, no account creation.</p>
-          <button onClick={() => openConnectModal?.()} className="bg-brand hover:bg-brand-hover text-white rounded-2xl px-6 py-3 font-medium">
+          <button onClick={() => openConnectModal?.()} className="bg-brand hover:bg-brand-hover text-brand-ink rounded-2xl px-6 py-3 font-medium">
             Connect wallet
           </button>
         </div>
@@ -147,7 +147,7 @@ export function Settings() {
           <button
             onClick={save}
             disabled={busy}
-            className="w-full bg-brand hover:bg-brand-hover disabled:bg-bg-elevated disabled:text-text-muted text-white rounded-2xl py-3.5 flex items-center justify-center gap-2 font-medium transition-colors"
+            className="w-full bg-brand hover:bg-brand-hover disabled:bg-bg-elevated disabled:text-text-muted text-brand-ink rounded-2xl py-3.5 flex items-center justify-center gap-2 font-medium transition-colors"
           >
             {busy ? <><Loader2 size={16} className="animate-spin" /> {isPending ? 'Confirm in wallet…' : 'Confirming on-chain…'}</> :
              isSuccess ? <><CheckCircle2 size={16} /> Saved</> :

@@ -18,7 +18,7 @@ export function TopBar() {
   return (
     <header className="h-12 bg-bg-base border-b border-border-subtle flex items-center justify-between px-4">
       <button onClick={() => navigate('/')} className="flex items-center gap-2">
-        <div className="w-6 h-6 rounded-md bg-brand flex items-center justify-center text-white font-bold text-xs">D</div>
+        <div className="w-6 h-6 rounded-md bg-brand flex items-center justify-center text-brand-ink font-bold text-xs">D</div>
         <span className="font-semibold text-text-primary text-sm">DMpay</span>
       </button>
       <div className="flex items-center gap-2">
@@ -49,7 +49,7 @@ export function TopBar() {
                     <div className="flex gap-2">
                       <button onClick={() => { setShowErr(false); init(); }} disabled={initializing} className="flex-1 bg-bg-elevated hover:bg-bg-hover text-text-primary rounded-xl py-2 text-xs font-medium">Retry</button>
                       {needsRevoke && (
-                        <button onClick={() => { setShowErr(false); revokeAndRetry(); }} disabled={initializing} className="flex-1 bg-brand hover:bg-brand-hover text-white rounded-xl py-2 text-xs font-medium">Revoke old & retry</button>
+                        <button onClick={() => { setShowErr(false); revokeAndRetry(); }} disabled={initializing} className="flex-1 bg-brand hover:bg-brand-hover text-brand-ink rounded-xl py-2 text-xs font-medium">Revoke old & retry</button>
                       )}
                     </div>
                   </div>
@@ -59,7 +59,7 @@ export function TopBar() {
               <button
                 onClick={() => init()}
                 disabled={initializing}
-                className="flex items-center gap-1.5 bg-brand hover:bg-brand-hover disabled:opacity-50 text-white rounded-full px-3 py-1.5 text-sm transition-colors"
+                className="flex items-center gap-1.5 bg-brand hover:bg-brand-hover disabled:opacity-50 text-brand-ink rounded-full px-3 py-1.5 text-sm transition-colors"
               >
                 {initializing ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
                 {initializing ? 'Connecting…' : 'Connect XMTP'}

@@ -8,7 +8,7 @@ export function Footer() {
       <div className="max-w-6xl mx-auto px-6 py-10 grid grid-cols-1 md:grid-cols-4 gap-8 text-sm">
         <div className="col-span-1 md:col-span-1">
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-6 h-6 rounded-md bg-brand flex items-center justify-center text-white font-bold text-xs">D</div>
+            <div className="w-6 h-6 rounded-md bg-brand flex items-center justify-center text-brand-ink font-bold text-xs">D</div>
             <span className="font-semibold text-text-primary">DMpay</span>
           </div>
           <p className="text-text-secondary">Non-custodial pay-to-DM on Ethereum. Set your price, get paid in USDC or ETH, message over XMTP.</p>

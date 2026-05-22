@@ -65,7 +65,7 @@ export function ChatList() {
         ) : (
           <button
             onClick={() => setSearching(true)}
-            className="w-full bg-brand hover:bg-brand-hover text-white rounded-xl py-2.5 flex items-center justify-center gap-2 font-medium text-sm transition-colors"
+            className="w-full bg-brand hover:bg-brand-hover text-brand-ink rounded-xl py-2.5 flex items-center justify-center gap-2 font-medium text-sm transition-colors"
           >
             <Plus size={16} /> New chat
           </button>
@@ -120,7 +120,7 @@ function ChatRow({ row, active, onOpen }: { row: Row; active: boolean; onOpen: (
       onClick={() => peer && onOpen(peer)}
       disabled={!peer}
       className={`w-full flex items-center gap-3 p-3 rounded-xl mb-1 transition-colors text-left ${
-        active ? 'bg-brand text-white' : 'hover:bg-bg-hover'
+        active ? 'bg-brand text-brand-ink' : 'hover:bg-bg-hover'
       } disabled:opacity-50`}
     >
       <Avatar src={avatar || undefined} fallback={display[0]} size={40} />

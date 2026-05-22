@@ -102,47 +102,56 @@ export function Paywall({ recipient, recipientName, onUnlocked }: {
 
   return (
     <main className="flex-1 overflow-y-auto bg-bg-base flex items-center justify-center p-6">
-      <div className="max-w-md w-full bg-bg-panel border border-border-subtle rounded-3xl p-6 sm:p-8">
-        <h2 className="text-xl font-semibold text-text-primary mb-1">Open conversation with {recipientName}</h2>
-        <p className="text-sm text-text-secondary mb-6">Choose how you'd like to pay. 97.5% of every payment goes directly to {recipientName}.</p>
+      <div className="max-w-lg w-full bg-bg-panel border border-border-subtle rounded-3xl p-6 sm:p-8">
+        <div className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-text-muted mb-2">· Open conversation</div>
+        <h2 className="dm-display text-3xl text-text-primary mb-2">{recipientName}</h2>
+        <p className="text-sm text-text-secondary mb-6">Choose how you'd like to pay. 97.5% settles directly to {recipientName} — 2.5% protocol fee, no custody.</p>
 
-        <div className="space-y-2 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
           {usdc > 0n && (
             <TierOption
               selected={selected === 'usdc'}
               onSelect={() => setSelected('usdc')}
-              label="Per conversation"
-              price={`${formatUnits(usdc, 6)} USDC`}
-              note="One-time payment for this chat session"
+              icon={<Send size={14} />}
+              title="Pay to DM"
+              sub="One-time. End-to-end encrypted 1:1."
+              priceMain={`$${formatUnits(usdc, 6)}`}
+              priceAlt="USDC"
             />
           )}
           {eth > 0n && (
             <TierOption
               selected={selected === 'eth'}
               onSelect={() => setSelected('eth')}
-              label="Per conversation"
-              price={`${formatEther(eth)} ETH`}
-              note="One-time payment for this chat session"
+              icon={<Send size={14} />}
+              title="Pay to DM"
+              sub="One-time. End-to-end encrypted 1:1."
+              priceMain={`${formatEther(eth)} ETH`}
+              priceAlt="ETH"
             />
           )}
           {lUsdc > 0n && (
             <TierOption
+              featured
               selected={selected === 'lifetimeUsdc'}
               onSelect={() => setSelected('lifetimeUsdc')}
-              label="Lifetime pass"
-              price={`${formatUnits(lUsdc, 6)} USDC`}
-              note="Message forever — no future payments"
               icon={<InfinityIcon size={14} />}
+              title="Lifetime pass"
+              sub="Unlimited DMs. Pay once, forever."
+              priceMain={`$${formatUnits(lUsdc, 6)}`}
+              priceAlt="USDC"
             />
           )}
           {lEth > 0n && (
             <TierOption
+              featured={!(lUsdc > 0n)}
               selected={selected === 'lifetimeEth'}
               onSelect={() => setSelected('lifetimeEth')}
-              label="Lifetime pass"
-              price={`${formatEther(lEth)} ETH`}
-              note="Message forever — no future payments"
               icon={<InfinityIcon size={14} />}
+              title="Lifetime pass"
+              sub="Unlimited DMs. Pay once, forever."
+              priceMain={`${formatEther(lEth)} ETH`}
+              priceAlt="ETH"
             />
           )}
         </div>
@@ -169,25 +178,35 @@ export function Paywall({ recipient, recipientName, onUnlocked }: {
   );
 }
 
-function TierOption({ selected, onSelect, label, price, note, icon }: {
-  selected: boolean; onSelect: () => void; label: string; price: string; note: string; icon?: React.ReactNode;
+function TierOption({ selected, onSelect, icon, title, sub, priceMain, priceAlt, featured = false }: {
+  selected: boolean; onSelect: () => void; icon: React.ReactNode;
+  title: string; sub: string; priceMain: string; priceAlt: string; featured?: boolean;
 }) {
+  const base = 'w-full text-left rounded-2xl p-5 flex flex-col gap-3 transition-colors border';
+  let cls: string;
+  if (featured) {
+    cls = `${base} bg-brand text-brand-ink border-brand shadow-card ${selected ? 'ring-2 ring-brand-ink/20 ring-offset-2 ring-offset-bg-panel' : ''}`;
+  } else {
+    cls = `${base} ${selected ? 'bg-bg-elevated border-brand' : 'bg-bg-elevated border-border-subtle hover:bg-bg-hover'}`;
+  }
   return (
-    <button
-      onClick={onSelect}
-      className={`w-full text-left rounded-2xl border-2 transition-colors p-4 flex items-start gap-3 ${
-        selected ? 'border-brand bg-brand-soft' : 'border-border-subtle bg-bg-elevated hover:bg-bg-hover'
-      }`}
-    >
-      <div className={`w-5 h-5 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center ${selected ? 'border-brand bg-brand' : 'border-border-subtle'}`}>
-        {selected && <Check size={12} className="text-white" />}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-text-muted">
-          {icon} {label}
+    <button onClick={onSelect} className={cls}>
+      <div className="flex items-center justify-between">
+        <div className={`w-8 h-8 rounded-lg grid place-items-center ${featured ? 'bg-brand-ink/10 text-brand-ink' : 'bg-chip text-text-primary'}`}>
+          {icon}
         </div>
-        <div className="text-lg font-semibold text-text-primary mt-0.5">{price}</div>
-        <div className="text-xs text-text-secondary mt-0.5">{note}</div>
+        {featured && (
+          <span className="font-mono text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full bg-brand-ink/10">Best value</span>
+        )}
+        {selected && !featured && <Check size={14} className="text-text-primary" />}
+      </div>
+      <div>
+        <div className="text-[15px] font-medium">{title}</div>
+        <div className={`text-[12px] mt-1 leading-snug ${featured ? 'text-brand-ink/60' : 'text-text-muted'}`}>{sub}</div>
+      </div>
+      <div className="flex items-baseline gap-2 mt-1">
+        <span className="dm-display font-mono text-[26px]">{priceMain}</span>
+        <span className={`font-mono text-[12px] ${featured ? 'text-brand-ink/50' : 'text-text-muted'}`}>{priceAlt}</span>
       </div>
     </button>
   );
@@ -246,7 +265,7 @@ function PayAction({ tier, recipient, amount, onPaid }: {
       <button
         onClick={approve}
         disabled={approving}
-        className="w-full bg-brand hover:bg-brand-hover disabled:bg-bg-elevated disabled:text-text-muted text-white rounded-2xl py-3.5 flex items-center justify-center gap-2 font-medium transition-colors"
+        className="w-full bg-brand hover:bg-brand-hover disabled:bg-bg-elevated disabled:text-text-muted text-brand-ink rounded-2xl py-3.5 flex items-center justify-center gap-2 font-medium transition-colors"
       >
         {approving ? <><Loader2 size={16} className="animate-spin" /> Approving USDC…</> : 'Approve USDC'}
       </button>
@@ -257,7 +276,7 @@ function PayAction({ tier, recipient, amount, onPaid }: {
     <button
       onClick={pay}
       disabled={paying}
-      className="w-full bg-brand hover:bg-brand-hover disabled:bg-bg-elevated disabled:text-text-muted text-white rounded-2xl py-3.5 flex items-center justify-center gap-2 font-medium transition-colors"
+      className="w-full bg-brand hover:bg-brand-hover disabled:bg-bg-elevated disabled:text-text-muted text-brand-ink rounded-2xl py-3.5 flex items-center justify-center gap-2 font-medium transition-colors"
     >
       {paying ? <><Loader2 size={16} className="animate-spin" /> {payTx.isPending ? 'Confirm in wallet…' : 'Confirming on-chain…'}</> :
        <><Send size={16} /> {isLifetime ? 'Buy lifetime pass' : 'Pay & open conversation'}</>}

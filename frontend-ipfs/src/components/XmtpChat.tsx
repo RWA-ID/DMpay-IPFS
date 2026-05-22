@@ -110,7 +110,7 @@ export function XmtpChat({ recipient, recipientName }: {
             <div className="text-text-secondary text-xs max-w-sm mb-3">
               You've hit XMTP's 10 installations / wallet limit. Revoke old ones (other browsers/devices will need to reconnect).
             </div>
-            <button onClick={() => revokeAndRetry()} disabled={initializing} className="bg-brand hover:bg-brand-hover disabled:opacity-50 text-white rounded-2xl px-6 py-3 font-medium">
+            <button onClick={() => revokeAndRetry()} disabled={initializing} className="bg-brand hover:bg-brand-hover disabled:opacity-50 text-brand-ink rounded-2xl px-6 py-3 font-medium">
               {initializing ? 'Revoking…' : 'Revoke old installations & retry'}
             </button>
           </>
@@ -137,7 +137,7 @@ export function XmtpChat({ recipient, recipientName }: {
         <button
           onClick={() => init()}
           disabled={initializing}
-          className="bg-brand hover:bg-brand-hover disabled:opacity-50 text-white rounded-2xl px-6 py-3 font-medium"
+          className="bg-brand hover:bg-brand-hover disabled:opacity-50 text-brand-ink rounded-2xl px-6 py-3 font-medium"
         >
           {initializing ? 'Retry signature' : 'Connect XMTP'}
         </button>
@@ -176,7 +176,7 @@ export function XmtpChat({ recipient, recipientName }: {
           return (
             <div key={m.id} className={`flex ${fromMe ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-md px-4 py-2.5 rounded-bubble text-sm leading-relaxed whitespace-pre-wrap break-words ${
-                fromMe ? 'bg-bubble-outgoing text-white' : 'bg-bubble-incoming text-text-primary'
+                fromMe ? 'bg-bubble-outgoing text-brand-ink' : 'bg-bubble-incoming text-text-primary'
               }`}>
                 {text}
                 <div className={`text-[10px] mt-1 ${fromMe ? 'text-white/60 text-right' : 'text-text-muted'}`}>
@@ -200,11 +200,11 @@ export function XmtpChat({ recipient, recipientName }: {
             className="flex-1 bg-transparent text-text-primary placeholder:text-text-muted focus:outline-none text-sm py-1"
           />
           {draft.trim() ? (
-            <button onClick={send} disabled={sending} className="bg-brand hover:bg-brand-hover disabled:opacity-50 text-white rounded-full px-4 py-2 flex items-center gap-2 text-sm font-medium">
+            <button onClick={send} disabled={sending} className="bg-brand hover:bg-brand-hover disabled:opacity-50 text-brand-ink rounded-full px-4 py-2 flex items-center gap-2 text-sm font-medium">
               {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} Send
             </button>
           ) : (
-            <button className="bg-brand hover:bg-brand-hover text-white rounded-full px-4 py-2 flex items-center gap-2 text-sm font-medium">
+            <button className="bg-brand hover:bg-brand-hover text-brand-ink rounded-full px-4 py-2 flex items-center gap-2 text-sm font-medium">
               <Mic size={16} /> Voice
             </button>
           )}

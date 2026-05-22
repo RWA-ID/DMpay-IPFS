@@ -104,7 +104,7 @@ export function Landing() {
             <div className="text-sm text-text-secondary mb-5">Connect your wallet, set a price, and start receiving paid messages.</div>
             <button
               onClick={() => openConnectModal?.()}
-              className="bg-brand hover:bg-brand-hover text-white rounded-2xl px-6 py-3 font-medium text-sm"
+              className="bg-brand hover:bg-brand-hover text-brand-ink rounded-2xl px-6 py-3 font-medium text-sm"
             >
               Connect & set up profile
             </button>
@@ -161,7 +161,7 @@ export function Landing() {
           <p className="text-text-secondary mb-6">Set a price in under a minute. Free to enable.</p>
           <button
             onClick={() => (isConnected ? navigate('/settings') : openConnectModal?.())}
-            className="bg-brand hover:bg-brand-hover text-white rounded-2xl px-6 py-3 font-medium"
+            className="bg-brand hover:bg-brand-hover text-brand-ink rounded-2xl px-6 py-3 font-medium"
           >
             {isConnected ? 'Set up my profile →' : 'Connect & set price →'}
           </button>
