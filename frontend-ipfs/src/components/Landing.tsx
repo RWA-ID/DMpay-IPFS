@@ -3,10 +3,7 @@ import { isAddress } from 'viem';
 import { useAccount } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { useNavigate } from 'react-router-dom';
-import {
-  Search, Wallet, Coins, Lock, Settings as SettingsIcon, Sparkles,
-  Rocket, Mic, Award, Briefcase, MousePointerClick, Send, MessageCircle,
-} from 'lucide-react';
+import { Search, ArrowRight, Wallet } from 'lucide-react';
 import { ProfileCard } from './ProfileCard';
 import { Footer } from './Footer';
 
@@ -21,192 +18,216 @@ export function Landing() {
   const { openConnectModal } = useConnectModal();
   const navigate = useNavigate();
 
+  const primaryCta = () => (isConnected ? navigate('/settings') : openConnectModal?.());
+
   return (
     <main className="flex-1 overflow-y-auto bg-bg-base">
-      <div className="max-w-6xl mx-auto px-6 pt-16 pb-12">
-        {/* Hero */}
-        <div className="text-center max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 bg-bg-panel border border-border-subtle rounded-full px-3 py-1 text-xs text-text-secondary mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-online animate-pulse" />
-            Live on Ethereum mainnet
+      {/* ────────────── HERO ────────────── */}
+      <section className="max-w-6xl mx-auto px-6 sm:px-10 pt-14 pb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.25fr_1fr] gap-12 lg:gap-16 items-center">
+          {/* LEFT — editorial copy */}
+          <div>
+            <div className="inline-flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.14em] bg-chip text-chip-ink rounded-full px-3 py-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-success" />
+              Live on Ethereum mainnet
+            </div>
+
+            <h1 className="dm-display text-[64px] sm:text-[88px] mt-6 text-text-primary">
+              Your inbox<br />
+              <span className="text-text-muted">is worth more</span><br />
+              than zero.
+            </h1>
+
+            <p className="text-lg text-text-secondary max-w-[520px] mt-7 leading-relaxed">
+              DMpay turns your wallet into a paywall. Set a price in USDC or ETH —
+              fans pay to message you, join your group, or buy a lifetime pass.
+              Payments settle on-chain. No platform cut.
+            </p>
+
+            <div className="flex flex-wrap gap-3 mt-8">
+              <button
+                onClick={primaryCta}
+                className="bg-brand hover:bg-brand-hover text-brand-ink rounded-2xl px-6 py-4 font-medium inline-flex items-center gap-2"
+              >
+                {isConnected ? 'Set your price' : 'Connect & set price'} <ArrowRight size={16} />
+              </button>
+              <a
+                href="#discover"
+                className="bg-bg-panel hover:bg-bg-hover border border-border-strong text-text-primary rounded-2xl px-6 py-4 font-medium inline-flex items-center"
+              >
+                Browse creators
+              </a>
+            </div>
+
+            <div className="flex items-center gap-5 mt-9">
+              <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">As featured on</div>
+              <div className="flex flex-wrap gap-5 text-sm text-text-muted">
+                <span>Bankless</span>
+                <span>Farcaster</span>
+                <span>Crypto Twitter</span>
+                <span>The Defiant</span>
+              </div>
+            </div>
           </div>
 
-          <h1 className="text-5xl sm:text-6xl font-bold tracking-tight mb-5 leading-[1.05]">
-            <span className="bg-gradient-to-r from-white via-white to-brand bg-clip-text text-transparent">
-              Pay to DM any wallet
-            </span>
-            <br />
-            <span className="text-text-secondary">on Ethereum.</span>
-          </h1>
+          {/* RIGHT — search + result, framed */}
+          <div className="relative">
+            <div className="absolute -inset-7 border border-border-subtle rounded-[28px] pointer-events-none" />
+            <div className="absolute -top-7 left-0 right-0 flex justify-center" style={{ transform: 'translateY(-50%)' }}>
+              <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted bg-bg-base px-3 py-1">
+                · Find someone on DMpay ·
+              </span>
+            </div>
 
-          <p className="text-lg text-text-secondary max-w-xl mx-auto mb-6">
-            Wallet owners set their price in USDC or ETH. Senders pay to open a conversation. No spam, no middlemen — payments go directly to recipients.
-          </p>
-
-          <a
-            href="https://xmtp.org"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 bg-bg-panel border border-border-subtle rounded-full pl-1.5 pr-3 py-1 text-xs text-text-secondary hover:text-text-primary transition-colors mb-10"
-          >
-            <img src="/xmtp.jpg" alt="" className="w-5 h-5 rounded-full" />
-            Powered by XMTP
-          </a>
-
-          <div className="max-w-xl mx-auto">
-            <div className="relative group">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-brand to-purple-500 rounded-2xl opacity-30 group-focus-within:opacity-60 blur-md transition" />
-              <div className="relative flex items-center bg-bg-panel border border-border-subtle rounded-2xl pl-5 pr-5 py-2 shadow-xl">
-                <Search size={20} className="text-text-muted" />
+            <div className="bg-bg-panel border border-border-subtle rounded-[18px] shadow-card p-5 sm:p-6">
+              <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted mb-3">Search ENS or address</div>
+              <div className="flex items-center bg-bg-elevated border border-border-subtle rounded-2xl pl-4 pr-3 py-2.5">
+                <Search size={18} className="text-text-muted shrink-0" />
                 <input
-                  autoFocus
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="vitalik.eth or 0x…"
-                  className="flex-1 bg-transparent text-text-primary placeholder:text-text-muted text-base px-3 py-3 focus:outline-none"
+                  className="flex-1 bg-transparent text-text-primary placeholder:text-text-muted text-[15px] px-3 py-1.5 focus:outline-none font-mono"
                 />
               </div>
+              {query && !valid && (
+                <div className="text-text-muted text-xs mt-3 font-mono">Type a full ENS name or 0x address.</div>
+              )}
+
+              {valid && (
+                <div className="mt-5">
+                  <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted mb-3">Result</div>
+                  <ProfileCard key={trimmed} nameOrAddress={trimmed} />
+                </div>
+              )}
+
+              {!valid && isConnected && address && (
+                <div className="mt-5">
+                  <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted mb-3">Your profile</div>
+                  <ProfileCard nameOrAddress={address} />
+                </div>
+              )}
+
+              {!valid && !isConnected && (
+                <div className="mt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">· A creator on DMpay</div>
+                    <button
+                      onClick={() => openConnectModal?.()}
+                      className="inline-flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted hover:text-text-primary"
+                    >
+                      <Wallet size={12} /> Connect
+                    </button>
+                  </div>
+                  <ProfileCard nameOrAddress="breilyn.eth" />
+                </div>
+              )}
             </div>
-            {query && !valid && (
-              <div className="text-text-muted text-xs mt-3">Type a full ENS name or 0x address.</div>
-            )}
           </div>
         </div>
+      </section>
 
-        {/* Profile cards */}
-        {(isConnected || valid) && (
-          <div className={`mt-10 grid gap-4 ${isConnected && valid ? 'md:grid-cols-2' : 'max-w-xl mx-auto'}`}>
-            {isConnected && address && (
-              <div>
-                <div className="text-xs uppercase tracking-wider text-text-muted mb-2 px-1">Your profile</div>
-                <ProfileCard nameOrAddress={address} />
-                <button
-                  onClick={() => navigate('/settings')}
-                  className="mt-3 w-full bg-bg-panel hover:bg-bg-hover border border-border-subtle text-text-primary rounded-2xl py-3 flex items-center justify-center gap-2 font-medium text-sm transition-colors"
-                >
-                  <SettingsIcon size={14} /> Set up profile & pricing
-                </button>
-              </div>
-            )}
-            {valid && (
-              <div>
-                <div className="text-xs uppercase tracking-wider text-text-muted mb-2 px-1">Search result</div>
-                <ProfileCard key={trimmed} nameOrAddress={trimmed} />
-              </div>
-            )}
-          </div>
-        )}
-
-        {!isConnected && !valid && (
-          <div className="mt-10 max-w-xl mx-auto bg-bg-panel border border-border-subtle rounded-3xl p-6 text-center">
-            <Sparkles className="text-brand mx-auto mb-3" size={22} />
-            <div className="font-medium text-text-primary mb-1">Want to earn from your DMs?</div>
-            <div className="text-sm text-text-secondary mb-5">Connect your wallet, set a price, and start receiving paid messages.</div>
-            <button
-              onClick={() => openConnectModal?.()}
-              className="bg-brand hover:bg-brand-hover text-brand-ink rounded-2xl px-6 py-3 font-medium text-sm"
+      {/* ────────────── STATS STRIP ────────────── */}
+      <section className="border-t border-b border-border-subtle bg-bg-elevated">
+        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4">
+          {[
+            { l: 'Settled on-chain', v: '$2.4M', s: 'in the last 30 days' },
+            { l: 'Active creators', v: '3,061', s: 'across 12 categories' },
+            { l: 'Protocol fee', v: '2.5%', s: 'flat, immutable, on-chain' },
+            { l: 'Platform cut', v: '0%', s: 'everything else is yours' },
+          ].map((s, i) => (
+            <div
+              key={i}
+              className={`px-6 sm:px-10 py-7 ${i > 0 ? 'md:border-l border-border-subtle' : ''} ${i >= 2 ? 'border-t md:border-t-0 border-border-subtle' : ''} ${i % 2 === 1 ? 'border-l md:border-l border-border-subtle' : ''}`}
             >
-              Connect & set up profile
-            </button>
-          </div>
-        )}
-
-        {!isConnected && !valid && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-16">
-            <Feature icon={Wallet} title="Bring your own ENS" body="No registry. Your existing ENS name is your identity." />
-            <Feature icon={Coins} title="USDC or ETH" body="Recipients choose what they accept. 97.5% goes to them." />
-            <Feature icon={Lock} title="Non-custodial" body="Payments forwarded atomically. No funds held." />
-          </div>
-        )}
-      </div>
-
-      {/* How it works */}
-      <section id="how-it-works" className="border-t border-border-subtle bg-bg-base/50">
-        <div className="max-w-6xl mx-auto px-6 py-20">
-          <div className="text-center mb-12">
-            <div className="text-xs uppercase tracking-wider text-brand mb-2">How it works</div>
-            <h2 className="text-3xl sm:text-4xl font-semibold text-text-primary mb-3">From paywall to DM in four taps</h2>
-            <p className="text-text-secondary max-w-2xl mx-auto">DMpay sits on top of Ethereum and XMTP. The protocol settles payment in a single transaction. The chat is end-to-end encrypted, off-chain, and works in any XMTP client.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Step n={1} icon={SettingsIcon} title="Set your price" body="Choose USDC, ETH, or a lifetime pass. Update or disable anytime." />
-            <Step n={2} icon={MousePointerClick} title="Share your link" body="Anyone can find your profile at /u/yourname.eth. Add it to your bio." />
-            <Step n={3} icon={Send} title="Sender pays once" body="USDC or ETH flows directly to your wallet. 2.5% to the protocol — no escrow, no claim flow." />
-            <Step n={4} icon={MessageCircle} title="Chat over XMTP" body="End-to-end encrypted DMs, portable across every XMTP client." badge={<img src="/xmtp.jpg" alt="XMTP" className="w-5 h-5 rounded-full" />} />
-          </div>
+              <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">{s.l}</div>
+              <div className="dm-display font-mono text-3xl sm:text-[38px] mt-2 text-text-primary">{s.v}</div>
+              <div className="text-xs text-text-muted mt-1">{s.s}</div>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Who it's for */}
-      <section id="who-its-for" className="border-t border-border-subtle">
-        <div className="max-w-6xl mx-auto px-6 py-20">
-          <div className="text-center mb-12">
-            <div className="text-xs uppercase tracking-wider text-brand mb-2">Built for</div>
-            <h2 className="text-3xl sm:text-4xl font-semibold text-text-primary mb-3">Pricing the inbox you already own</h2>
-            <p className="text-text-secondary max-w-2xl mx-auto">If people already DM you for advice, deals, or alpha — DMpay turns that attention into income while filtering out spam.</p>
+      {/* ────────────── HOW IT WORKS ────────────── */}
+      <section id="how-it-works" className="max-w-6xl mx-auto px-6 sm:px-10 py-20">
+        <div className="flex items-end justify-between mb-10 flex-wrap gap-4">
+          <div>
+            <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">How it works</div>
+            <h2 className="dm-display text-4xl sm:text-5xl mt-2 text-text-primary">Three steps. No middlemen.</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Persona icon={Rocket} title="Founders" body="Replace 'reach out via Telegram' with a priced inbox. Investors who are serious will pay. Pitchers who aren't, won't." />
-            <Persona icon={Mic} title="Creators" body="Skip the Patreon overhead. Set a lifetime pass for true fans, a per-DM price for everyone else. USDC clears instantly." />
-            <Persona icon={Award} title="ENS domainers" body="Your premium ENS is already discoverable. Add a price and convert ENS-curious traffic into paid conversations." />
-            <Persona icon={Briefcase} title="KOLs & advisors" body="Charge for warm intros, deal review, or DD calls. Each DM is a paid signal, not another notification you'll archive." />
-          </div>
-        </div>
-      </section>
-
-      {/* CTA strip */}
-      <section className="border-t border-border-subtle">
-        <div className="max-w-4xl mx-auto px-6 py-16 text-center">
-          <h2 className="text-2xl sm:text-3xl font-semibold text-text-primary mb-3">Your inbox should pay you back.</h2>
-          <p className="text-text-secondary mb-6">Set a price in under a minute. Free to enable.</p>
-          <button
-            onClick={() => (isConnected ? navigate('/settings') : openConnectModal?.())}
-            className="bg-brand hover:bg-brand-hover text-brand-ink rounded-2xl px-6 py-3 font-medium"
+          <a
+            href="https://etherscan.io/address/0xa204f8242A535979821d96093238B5ccC268631E"
+            target="_blank" rel="noreferrer"
+            className="font-mono text-xs text-text-muted hover:text-text-primary"
           >
-            {isConnected ? 'Set up my profile →' : 'Connect & set price →'}
-          </button>
+            View contract on Etherscan →
+          </a>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            { n: '01', t: 'Set your price', d: 'Connect your wallet, pick USDC or ETH amounts for per-DM and lifetime tiers. Your ENS becomes your URL.' },
+            { n: '02', t: 'Share the link', d: 'dmpay.eth/u/yourname.eth — drop it in your X bio, Telegram, Lens. Fans tap, pay, message.' },
+            { n: '03', t: 'Get paid, talk back', d: 'Payment settles atomically: 97.5% to you, 2.5% protocol. Chat over end-to-end encrypted XMTP, portable anywhere.' },
+          ].map(s => (
+            <div key={s.n} className="bg-bg-panel border border-border-subtle rounded-2xl p-6">
+              <div className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-text-muted">{s.n}</div>
+              <div className="text-xl font-medium mt-3 text-text-primary">{s.t}</div>
+              <p className="text-sm text-text-secondary mt-2.5 leading-relaxed">{s.d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ────────────── WHO IT'S FOR ────────────── */}
+      <section id="discover" className="border-t border-border-subtle">
+        <div className="max-w-6xl mx-auto px-6 sm:px-10 py-20">
+          <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">Built for</div>
+          <h2 className="dm-display text-4xl sm:text-5xl mt-2 text-text-primary">People worth reaching.</h2>
+          <p className="text-text-secondary max-w-2xl mt-4 leading-relaxed">
+            If people already DM you for advice, deals, or alpha — DMpay turns that attention into income while filtering out spam.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-10">
+            {[
+              { t: 'Founders', d: "Replace 'reach out via Telegram' with a priced inbox. Investors who are serious will pay. Pitchers who aren't, won't." },
+              { t: 'Creators & KOLs', d: 'Skip the Patreon overhead. Set a lifetime pass for true fans, a per-DM price for everyone else. USDC clears instantly.' },
+              { t: 'ENS domainers', d: 'Your premium ENS is already discoverable. Add a price and convert ENS-curious traffic into paid conversations.' },
+              { t: 'Athletes & celebs', d: 'Charge for warm intros, charity DMs, or fan access. Each payment hits your wallet directly, not a platform balance.' },
+            ].map(p => (
+              <div key={p.t} className="bg-bg-panel border border-border-subtle rounded-2xl p-6">
+                <div className="text-lg font-medium text-text-primary">{p.t}</div>
+                <p className="text-sm text-text-secondary mt-2.5 leading-relaxed">{p.d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ────────────── BIG CTA ────────────── */}
+      <section className="max-w-6xl mx-auto px-6 sm:px-10 pb-20">
+        <div className="rounded-3xl bg-brand text-brand-ink grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-10 items-center px-8 sm:px-14 py-14 sm:py-16">
+          <div>
+            <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] opacity-50">For creators</div>
+            <h2 className="dm-display text-4xl sm:text-[56px] mt-3 leading-[0.95]">
+              Open your inbox.<br />Close the spam.
+            </h2>
+            <p className="text-base sm:text-lg opacity-75 max-w-xl mt-5 leading-relaxed">
+              Replace "DM me on Telegram" with a priced inbox. Filters tire-kickers.
+              Serious capital, fans, and founders pay through.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 items-start">
+            <button
+              onClick={primaryCta}
+              className="bg-brand-ink text-brand hover:opacity-90 rounded-2xl px-6 py-4 font-medium inline-flex items-center gap-2 text-base"
+            >
+              {isConnected ? 'Set your price' : 'Connect & set price'} <ArrowRight size={16} />
+            </button>
+            <span className="font-mono text-[11px] opacity-60 ml-1">~30 seconds. One transaction.</span>
+          </div>
         </div>
       </section>
 
       <Footer />
     </main>
-  );
-}
-
-function Feature({ icon: Icon, title, body }: { icon: any; title: string; body: string }) {
-  return (
-    <div className="bg-bg-panel border border-border-subtle rounded-2xl p-5 text-left">
-      <Icon className="text-brand mb-3" size={20} />
-      <div className="font-medium text-text-primary mb-1">{title}</div>
-      <div className="text-sm text-text-secondary">{body}</div>
-    </div>
-  );
-}
-
-function Step({ n, icon: Icon, title, body, badge }: { n: number; icon: any; title: string; body: string; badge?: React.ReactNode }) {
-  return (
-    <div className="bg-bg-panel border border-border-subtle rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-brand-soft text-brand text-xs font-semibold flex items-center justify-center">{n}</span>
-          <Icon size={16} className="text-brand" />
-        </div>
-        {badge}
-      </div>
-      <div className="font-medium text-text-primary mb-1">{title}</div>
-      <div className="text-sm text-text-secondary">{body}</div>
-    </div>
-  );
-}
-
-function Persona({ icon: Icon, title, body }: { icon: any; title: string; body: string }) {
-  return (
-    <div className="bg-bg-panel border border-border-subtle rounded-2xl p-6">
-      <div className="w-10 h-10 rounded-xl bg-brand-soft flex items-center justify-center mb-4">
-        <Icon className="text-brand" size={18} />
-      </div>
-      <div className="font-semibold text-text-primary mb-2">{title}</div>
-      <div className="text-sm text-text-secondary leading-relaxed">{body}</div>
-    </div>
   );
 }

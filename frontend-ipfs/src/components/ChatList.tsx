@@ -126,10 +126,10 @@ function ChatRow({ row, active, onOpen }: { row: Row; active: boolean; onOpen: (
       <Avatar src={avatar || undefined} fallback={display[0]} size={40} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
-          <span className={`font-medium truncate ${active ? 'text-white' : 'text-text-primary'}`}>{display}</span>
-          <span className={`text-xs ${active ? 'text-white/80' : 'text-text-muted'}`}>{time}</span>
+          <span className={`font-medium truncate ${active ? 'text-brand-ink' : 'text-text-primary'}`}>{display}</span>
+          <span className={`text-xs ${active ? 'text-brand-ink/70' : 'text-text-muted'}`}>{time}</span>
         </div>
-        <div className={`text-sm truncate ${active ? 'text-white/80' : 'text-text-secondary'}`}>{preview || 'No messages yet'}</div>
+        <div className={`text-sm truncate ${active ? 'text-brand-ink/70' : 'text-text-secondary'}`}>{preview || 'No messages yet'}</div>
       </div>
     </button>
   );

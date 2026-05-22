@@ -31,7 +31,7 @@ function SidebarBtn({ icon: Icon, active, onClick, label }: { icon: any; active?
       title={label}
       aria-label={label}
       className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-        active ? 'bg-brand-soft text-brand' : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
+        active ? 'bg-chip text-text-primary' : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
       }`}
     >
       <Icon size={20} />
