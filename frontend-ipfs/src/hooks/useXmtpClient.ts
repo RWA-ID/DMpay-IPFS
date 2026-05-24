@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAccount, useWalletClient } from 'wagmi';
 import { Client } from '@xmtp/browser-sdk';
-import { makeXmtpSigner, revokeAllInstallations, XMTP_ENV } from '../lib/xmtp';
+import { makeXmtpSigner, revokeAllInstallations, XMTP_ENV, XMTP_CODECS } from '../lib/xmtp';
 
 let cachedClient: Client<unknown> | null = null;
 let cachedAddr: string | null = null;
@@ -31,7 +31,7 @@ export function useXmtpClient() {
     try {
       console.log('[XMTP] creating client for', address);
       const signer = makeXmtpSigner(walletClient);
-      const c = await Client.create(signer, { env: XMTP_ENV } as Parameters<typeof Client.create>[1]);
+      const c = await Client.create(signer, { env: XMTP_ENV, codecs: XMTP_CODECS } as Parameters<typeof Client.create>[1]);
       cachedClient = c;
       cachedAddr = address;
       setClient(c);
@@ -64,7 +64,7 @@ export function useXmtpClient() {
       const n = await revokeAllInstallations(walletClient);
       console.log('[XMTP] revoked', n, 'installations; creating new client…');
       const signer = makeXmtpSigner(walletClient);
-      const c = await Client.create(signer, { env: XMTP_ENV } as Parameters<typeof Client.create>[1]);
+      const c = await Client.create(signer, { env: XMTP_ENV, codecs: XMTP_CODECS } as Parameters<typeof Client.create>[1]);
       cachedClient = c;
       cachedAddr = address ?? null;
       setClient(c);

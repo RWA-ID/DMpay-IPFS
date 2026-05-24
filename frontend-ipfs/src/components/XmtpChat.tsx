@@ -1,9 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAccount } from 'wagmi';
-import { Loader2, Mic, Plus, Smile, Send, AlertCircle } from 'lucide-react';
+import { Loader2, Mic, Plus, Smile, Send, AlertCircle, X } from 'lucide-react';
 import type { Dm, DecodedMessage } from '@xmtp/browser-sdk';
+import {
+  AttachmentCodec,
+  RemoteAttachmentCodec,
+  ContentTypeAttachment,
+  ContentTypeRemoteAttachment,
+  type Attachment,
+  type RemoteAttachment,
+} from '@xmtp/content-type-remote-attachment';
+import EmojiPicker, { type EmojiClickData, Theme as EmojiTheme } from 'emoji-picker-react';
 import { useXmtpClient } from '../hooks/useXmtpClient';
 import { ethIdentifier } from '../lib/xmtp';
+import { uploadEncryptedToPinata } from '../lib/pinata';
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 export function XmtpChat({ recipient, recipientName }: {
   recipient: `0x${string}`;
@@ -17,20 +29,22 @@ export function XmtpChat({ recipient, recipientName }: {
   const [setupError, setSetupError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showEmoji, setShowEmoji] = useState(false);
   const [recipientReachable, setRecipientReachable] = useState<boolean | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<{ end: () => Promise<unknown> } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Initialize XMTP client on mount
   useEffect(() => { if (!client && !initializing) init(); }, [client, init, initializing]);
 
-  // Capture our inboxId
   useEffect(() => {
     if (!client) return;
     setMyInboxId(client.inboxId ?? null);
   }, [client]);
 
-  // Set up conversation
   useEffect(() => {
     if (!client) return;
     let cancelled = false;
@@ -43,10 +57,8 @@ export function XmtpChat({ recipient, recipientName }: {
         setRecipientReachable(reachable);
         if (!reachable) return;
 
-        // Pull any pending welcome messages + new DMs from the network
         await client.conversations.sync().catch((e) => console.warn('conversations sync failed', e));
 
-        // try to fetch existing, else create
         let dm = await client.conversations.fetchDmByIdentifier(identifier);
         if (!dm) dm = await client.conversations.createDmWithIdentifier(identifier);
         if (cancelled) return;
@@ -54,7 +66,6 @@ export function XmtpChat({ recipient, recipientName }: {
 
         await dm.sync().catch((e) => console.warn('dm sync failed', e));
         const initial = await dm.messages();
-        console.log('[XMTP] loaded', initial.length, 'messages for', recipient);
         if (cancelled) return;
         setMessages(initial);
 
@@ -77,10 +88,17 @@ export function XmtpChat({ recipient, recipientName }: {
     };
   }, [client, recipient]);
 
-  // Auto-scroll
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages.length]);
+
+  // Close emoji picker on outside click / Escape
+  useEffect(() => {
+    if (!showEmoji) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowEmoji(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showEmoji]);
 
   async function send() {
     if (!conversation || !draft.trim() || sending) return;
@@ -97,7 +115,60 @@ export function XmtpChat({ recipient, recipientName }: {
     }
   }
 
-  // Render states
+  function onEmojiClick(data: EmojiClickData) {
+    const input = inputRef.current;
+    if (!input) {
+      setDraft((d) => d + data.emoji);
+      return;
+    }
+    const start = input.selectionStart ?? draft.length;
+    const end = input.selectionEnd ?? draft.length;
+    const next = draft.slice(0, start) + data.emoji + draft.slice(end);
+    setDraft(next);
+    requestAnimationFrame(() => {
+      input.focus();
+      const pos = start + data.emoji.length;
+      input.setSelectionRange(pos, pos);
+    });
+  }
+
+  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !conversation) return;
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Only image files are supported right now.');
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setUploadError(`Image too large (max ${MAX_IMAGE_BYTES / 1024 / 1024} MB).`);
+      return;
+    }
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      const attachment: Attachment = { filename: file.name, mimeType: file.type, data: buf };
+      const encrypted = await RemoteAttachmentCodec.encodeEncrypted(attachment, new AttachmentCodec());
+      const url = await uploadEncryptedToPinata(encrypted.payload, file.name);
+      const remote: RemoteAttachment = {
+        url,
+        contentDigest: encrypted.digest,
+        salt: encrypted.salt,
+        nonce: encrypted.nonce,
+        secret: encrypted.secret,
+        scheme: 'https://',
+        filename: file.name,
+        contentLength: file.size,
+      };
+      await (conversation as any).send(remote, ContentTypeRemoteAttachment);
+    } catch (err: any) {
+      console.error('attachment send failed', err);
+      setUploadError(err?.message ?? 'Failed to send image');
+    } finally {
+      setUploading(false);
+    }
+  }
 
   if (error || setupError) {
     return (
@@ -170,29 +241,61 @@ export function XmtpChat({ recipient, recipientName }: {
           </div>
         )}
         {messages.map((m) => {
-          const fromMe = myInboxId && m.senderInboxId === myInboxId;
-          const text = typeof m.content === 'string' ? m.content : '';
-          if (!text) return null;
+          const fromMe = !!myInboxId && m.senderInboxId === myInboxId;
           return (
-            <div key={m.id} className={`flex ${fromMe ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-md px-4 py-2.5 rounded-bubble text-sm leading-relaxed whitespace-pre-wrap break-words ${
-                fromMe ? 'bg-bubble-outgoing text-brand-ink' : 'bg-bubble-incoming text-text-primary'
-              }`}>
-                {text}
-                <div className={`text-[10px] mt-1 ${fromMe ? 'text-white/60 text-right' : 'text-text-muted'}`}>
-                  {new Date(Number(m.sentAtNs / 1_000_000n)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </div>
-              </div>
-            </div>
+            <MessageBubble key={m.id} message={m} fromMe={fromMe} client={client} />
           );
         })}
       </div>
 
-      <div className="p-4 border-t border-border-subtle">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={onPickFile}
+      />
+
+      {uploadError && (
+        <div className="px-4 pb-2">
+          <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-xs rounded-xl px-3 py-2 flex items-start gap-2">
+            <AlertCircle size={14} className="shrink-0 mt-0.5" />
+            <span className="flex-1">{uploadError}</span>
+            <button onClick={() => setUploadError(null)} className="text-red-300 hover:text-red-200"><X size={14} /></button>
+          </div>
+        </div>
+      )}
+
+      <div className="relative p-4 border-t border-border-subtle">
+        {showEmoji && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setShowEmoji(false)} />
+            <div className="absolute bottom-20 left-4 z-20 shadow-2xl rounded-2xl overflow-hidden">
+              <EmojiPicker theme={EmojiTheme.DARK} onEmojiClick={onEmojiClick} lazyLoadEmojis width={320} height={380} />
+            </div>
+          </>
+        )}
+
         <div className="flex items-center gap-2 bg-bg-elevated rounded-2xl px-3 py-2 focus-within:ring-1 focus-within:ring-brand">
-          <button className="p-2 text-text-secondary hover:text-text-primary"><Plus size={18} /></button>
-          <button className="p-2 text-text-secondary hover:text-text-primary"><Smile size={18} /></button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            title="Send image"
+            className="p-2 text-text-secondary hover:text-text-primary disabled:opacity-50"
+          >
+            {uploading ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowEmoji((s) => !s)}
+            title="Emoji"
+            className={`p-2 hover:text-text-primary ${showEmoji ? 'text-brand' : 'text-text-secondary'}`}
+          >
+            <Smile size={18} />
+          </button>
           <input
+            ref={inputRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
@@ -216,6 +319,78 @@ export function XmtpChat({ recipient, recipientName }: {
       </div>
     </>
   );
+}
+
+function MessageBubble({ message, fromMe, client }: {
+  message: DecodedMessage<unknown>;
+  fromMe: boolean;
+  client: any;
+}) {
+  const ct = (message as any).contentType;
+  const time = new Date(Number(message.sentAtNs / 1_000_000n)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const isText = typeof message.content === 'string';
+  const isAttachment = ct && ContentTypeAttachment.sameAs(ct);
+  const isRemoteAttachment = ct && ContentTypeRemoteAttachment.sameAs(ct);
+
+  if (!isText && !isAttachment && !isRemoteAttachment) return null;
+
+  return (
+    <div className={`flex ${fromMe ? 'justify-end' : 'justify-start'}`}>
+      <div className={`max-w-md px-4 py-2.5 rounded-bubble text-sm leading-relaxed break-words ${
+        fromMe ? 'bg-bubble-outgoing text-brand-ink' : 'bg-bubble-incoming text-text-primary'
+      }`}>
+        {isText && <div className="whitespace-pre-wrap">{message.content as string}</div>}
+        {isAttachment && <InlineImage attachment={message.content as Attachment} />}
+        {isRemoteAttachment && <RemoteImage remote={message.content as RemoteAttachment} client={client} />}
+        <div className={`text-[10px] mt-1 ${fromMe ? 'text-white/60 text-right' : 'text-text-muted'}`}>
+          {time}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InlineImage({ attachment }: { attachment: Attachment }) {
+  const [url] = useState(() => {
+    const blob = new Blob([new Uint8Array(attachment.data)], { type: attachment.mimeType });
+    return URL.createObjectURL(blob);
+  });
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  return <img src={url} alt={attachment.filename} className="rounded-xl max-h-80 max-w-full cursor-pointer" onClick={() => window.open(url, '_blank')} />;
+}
+
+function RemoteImage({ remote, client }: { remote: RemoteAttachment; client: any }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    (async () => {
+      try {
+        const decoded = (await RemoteAttachmentCodec.load(remote, client)) as Attachment;
+        if (cancelled) return;
+        const blob = new Blob([new Uint8Array(decoded.data)], { type: decoded.mimeType });
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      } catch (e: any) {
+        console.error('remote attachment load failed', e);
+        if (!cancelled) setErr(e?.message ?? 'Failed to load image');
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [remote, client]);
+
+  if (err) return <div className="text-xs opacity-80">⚠ Couldn't load image ({remote.filename})</div>;
+  if (!url) return (
+    <div className="flex items-center gap-2 text-xs opacity-80 py-6 px-2">
+      <Loader2 size={14} className="animate-spin" /> Loading image…
+    </div>
+  );
+  return <img src={url} alt={remote.filename} className="rounded-xl max-h-80 max-w-full cursor-pointer" onClick={() => window.open(url, '_blank')} />;
 }
 
 function CenteredState({ children }: { children: React.ReactNode }) {
