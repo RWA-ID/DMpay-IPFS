@@ -1,19 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAccount } from 'wagmi';
 import { Loader2, Mic, Plus, Smile, Send, AlertCircle, X } from 'lucide-react';
-import type { Dm, DecodedMessage } from '@xmtp/browser-sdk';
 import {
-  AttachmentCodec,
-  RemoteAttachmentCodec,
-  ContentTypeAttachment,
-  ContentTypeRemoteAttachment,
-  type Attachment,
-  type RemoteAttachment,
-} from '@xmtp/content-type-remote-attachment';
+  encryptAttachment,
+  decryptAttachment,
+  isAttachment,
+  isRemoteAttachment,
+  type Dm,
+  type DecodedMessage,
+} from '@xmtp/browser-sdk';
+
+type Attachment = { filename?: string; mimeType: string; content: Uint8Array };
+type RemoteAttachment = {
+  url: string;
+  contentDigest: string;
+  salt: Uint8Array;
+  nonce: Uint8Array;
+  secret: Uint8Array;
+  scheme: string;
+  filename: string;
+  contentLength: number;
+};
 import EmojiPicker, { type EmojiClickData, Theme as EmojiTheme } from 'emoji-picker-react';
 import { useXmtpClient } from '../hooks/useXmtpClient';
 import { ethIdentifier } from '../lib/xmtp';
-import { uploadEncryptedToPinata } from '../lib/pinata';
+import { uploadEncryptedToPinata, fetchAttachment } from '../lib/pinata';
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -31,6 +42,7 @@ export function XmtpChat({ recipient, recipientName }: {
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [pendingImage, setPendingImage] = useState<{ file: File; previewUrl: string } | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
   const [recipientReachable, setRecipientReachable] = useState<boolean | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -132,10 +144,10 @@ export function XmtpChat({ recipient, recipientName }: {
     });
   }
 
-  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file || !conversation) return;
+    if (!file) return;
     if (!file.type.startsWith('image/')) {
       setUploadError('Only image files are supported right now.');
       return;
@@ -145,23 +157,37 @@ export function XmtpChat({ recipient, recipientName }: {
       return;
     }
     setUploadError(null);
+    if (pendingImage) URL.revokeObjectURL(pendingImage.previewUrl);
+    setPendingImage({ file, previewUrl: URL.createObjectURL(file) });
+  }
+
+  function clearPendingImage() {
+    if (pendingImage) URL.revokeObjectURL(pendingImage.previewUrl);
+    setPendingImage(null);
+  }
+
+  async function sendPendingImage() {
+    if (!conversation || !pendingImage || uploading) return;
+    const { file } = pendingImage;
+    setUploadError(null);
     setUploading(true);
     try {
       const buf = new Uint8Array(await file.arrayBuffer());
-      const attachment: Attachment = { filename: file.name, mimeType: file.type, data: buf };
-      const encrypted = await RemoteAttachmentCodec.encodeEncrypted(attachment, new AttachmentCodec());
+      const attachment: Attachment = { filename: file.name, mimeType: file.type, content: buf };
+      const encrypted = await encryptAttachment(attachment);
       const url = await uploadEncryptedToPinata(encrypted.payload, file.name);
       const remote: RemoteAttachment = {
         url,
-        contentDigest: encrypted.digest,
+        contentDigest: encrypted.contentDigest,
         salt: encrypted.salt,
         nonce: encrypted.nonce,
         secret: encrypted.secret,
-        scheme: 'https://',
+        scheme: 'https',
         filename: file.name,
         contentLength: file.size,
       };
-      await (conversation as any).send(remote, ContentTypeRemoteAttachment);
+      await conversation.sendRemoteAttachment(remote as any);
+      clearPendingImage();
     } catch (err: any) {
       console.error('attachment send failed', err);
       setUploadError(err?.message ?? 'Failed to send image');
@@ -243,7 +269,7 @@ export function XmtpChat({ recipient, recipientName }: {
         {messages.map((m) => {
           const fromMe = !!myInboxId && m.senderInboxId === myInboxId;
           return (
-            <MessageBubble key={m.id} message={m} fromMe={fromMe} client={client} />
+            <MessageBubble key={m.id} message={m} fromMe={fromMe} />
           );
         })}
       </div>
@@ -262,6 +288,34 @@ export function XmtpChat({ recipient, recipientName }: {
             <AlertCircle size={14} className="shrink-0 mt-0.5" />
             <span className="flex-1">{uploadError}</span>
             <button onClick={() => setUploadError(null)} className="text-red-300 hover:text-red-200"><X size={14} /></button>
+          </div>
+        </div>
+      )}
+
+      {pendingImage && (
+        <div className="px-4 pt-3">
+          <div className="bg-bg-elevated border border-border-subtle rounded-2xl p-3 flex items-center gap-3">
+            <img src={pendingImage.previewUrl} alt="Preview" className="w-16 h-16 object-cover rounded-xl shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm text-text-primary truncate">{pendingImage.file.name}</div>
+              <div className="text-xs text-text-muted">{(pendingImage.file.size / 1024).toFixed(0)} KB · ready to send</div>
+            </div>
+            <button
+              onClick={clearPendingImage}
+              disabled={uploading}
+              title="Cancel"
+              className="p-2 text-text-secondary hover:text-text-primary rounded-lg hover:bg-bg-hover disabled:opacity-50"
+            >
+              <X size={16} />
+            </button>
+            <button
+              onClick={sendPendingImage}
+              disabled={uploading}
+              className="bg-brand hover:bg-brand-hover disabled:opacity-50 text-brand-ink rounded-full px-4 py-2 flex items-center gap-2 text-sm font-medium"
+            >
+              {uploading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+              {uploading ? 'Sending…' : 'Send image'}
+            </button>
           </div>
         </div>
       )}
@@ -321,27 +375,25 @@ export function XmtpChat({ recipient, recipientName }: {
   );
 }
 
-function MessageBubble({ message, fromMe, client }: {
+function MessageBubble({ message, fromMe }: {
   message: DecodedMessage<unknown>;
   fromMe: boolean;
-  client: any;
 }) {
-  const ct = (message as any).contentType;
   const time = new Date(Number(message.sentAtNs / 1_000_000n)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const isText = typeof message.content === 'string';
-  const isAttachment = ct && ContentTypeAttachment.sameAs(ct);
-  const isRemoteAttachment = ct && ContentTypeRemoteAttachment.sameAs(ct);
+  const text = typeof message.content === 'string' ? message.content : null;
+  const inline = isAttachment(message as any) ? (message.content as Attachment) : null;
+  const remote = isRemoteAttachment(message as any) ? (message.content as RemoteAttachment) : null;
 
-  if (!isText && !isAttachment && !isRemoteAttachment) return null;
+  if (!text && !inline && !remote) return null;
 
   return (
     <div className={`flex ${fromMe ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-md px-4 py-2.5 rounded-bubble text-sm leading-relaxed break-words ${
         fromMe ? 'bg-bubble-outgoing text-brand-ink' : 'bg-bubble-incoming text-text-primary'
       }`}>
-        {isText && <div className="whitespace-pre-wrap">{message.content as string}</div>}
-        {isAttachment && <InlineImage attachment={message.content as Attachment} />}
-        {isRemoteAttachment && <RemoteImage remote={message.content as RemoteAttachment} client={client} />}
+        {text && <div className="whitespace-pre-wrap">{text}</div>}
+        {inline && <InlineImage attachment={inline} />}
+        {remote && <RemoteImage remote={remote} />}
         <div className={`text-[10px] mt-1 ${fromMe ? 'text-white/60 text-right' : 'text-text-muted'}`}>
           {time}
         </div>
@@ -352,14 +404,14 @@ function MessageBubble({ message, fromMe, client }: {
 
 function InlineImage({ attachment }: { attachment: Attachment }) {
   const [url] = useState(() => {
-    const blob = new Blob([new Uint8Array(attachment.data)], { type: attachment.mimeType });
+    const blob = new Blob([new Uint8Array(attachment.content)], { type: attachment.mimeType });
     return URL.createObjectURL(blob);
   });
   useEffect(() => () => URL.revokeObjectURL(url), [url]);
   return <img src={url} alt={attachment.filename} className="rounded-xl max-h-80 max-w-full cursor-pointer" onClick={() => window.open(url, '_blank')} />;
 }
 
-function RemoteImage({ remote, client }: { remote: RemoteAttachment; client: any }) {
+function RemoteImage({ remote }: { remote: RemoteAttachment }) {
   const [url, setUrl] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -368,9 +420,10 @@ function RemoteImage({ remote, client }: { remote: RemoteAttachment; client: any
     let objectUrl: string | null = null;
     (async () => {
       try {
-        const decoded = (await RemoteAttachmentCodec.load(remote, client)) as Attachment;
+        const buf = await fetchAttachment(remote.url);
+        const decrypted = await decryptAttachment(new Uint8Array(buf), remote as any);
         if (cancelled) return;
-        const blob = new Blob([new Uint8Array(decoded.data)], { type: decoded.mimeType });
+        const blob = new Blob([new Uint8Array(decrypted.content)], { type: decrypted.mimeType });
         objectUrl = URL.createObjectURL(blob);
         setUrl(objectUrl);
       } catch (e: any) {
@@ -382,7 +435,7 @@ function RemoteImage({ remote, client }: { remote: RemoteAttachment; client: any
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [remote, client]);
+  }, [remote]);
 
   if (err) return <div className="text-xs opacity-80">⚠ Couldn't load image ({remote.filename})</div>;
   if (!url) return (

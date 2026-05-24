@@ -1,8 +1,9 @@
 import { hexToBytes, type WalletClient } from 'viem';
 import { IdentifierKind, type Signer, type Identifier, Client, createBackend, getInboxIdForIdentifier } from '@xmtp/browser-sdk';
-import { AttachmentCodec, RemoteAttachmentCodec } from '@xmtp/content-type-remote-attachment';
 
-export const XMTP_CODECS = [new AttachmentCodec(), new RemoteAttachmentCodec()];
+// Attachment + RemoteAttachment codecs ship with @xmtp/browser-sdk v7 — no
+// explicit registration needed; the SDK exposes encryptAttachment /
+// decryptAttachment / conversation.sendRemoteAttachment directly.
 
 export function makeXmtpSigner(walletClient: WalletClient): Signer {
   const account = walletClient.account!;

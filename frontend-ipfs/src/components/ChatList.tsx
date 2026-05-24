@@ -26,7 +26,10 @@ export function ChatList() {
     let cancelled = false;
     (async () => {
       try {
-        await client.conversations.sync();
+        // syncAll fetches new welcomes + preference updates and is the
+        // recommended startup call (covers sync() too). Including Denied so
+        // blocked threads stay visible if the user wants to unblock.
+        // https://docs.xmtp.org/chat-apps/list-stream-sync/sync-and-syncall
         await client.conversations.syncAll([ConsentState.Allowed, ConsentState.Unknown, ConsentState.Denied]);
         const dms = await client.conversations.listDms({
           consentStates: [ConsentState.Allowed, ConsentState.Unknown, ConsentState.Denied],

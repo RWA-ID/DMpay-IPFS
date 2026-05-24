@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAccount, useWalletClient } from 'wagmi';
 import { Client } from '@xmtp/browser-sdk';
-import { makeXmtpSigner, revokeAllInstallations, XMTP_ENV, XMTP_CODECS } from '../lib/xmtp';
+import { makeXmtpSigner, revokeAllInstallations, XMTP_ENV } from '../lib/xmtp';
 
 let cachedClient: Client<unknown> | null = null;
 let cachedAddr: string | null = null;
@@ -31,11 +31,18 @@ export function useXmtpClient() {
     try {
       console.log('[XMTP] creating client for', address);
       const signer = makeXmtpSigner(walletClient);
-      const c = await Client.create(signer, { env: XMTP_ENV, codecs: XMTP_CODECS } as Parameters<typeof Client.create>[1]);
+      const c = await Client.create(signer, { env: XMTP_ENV } as Parameters<typeof Client.create>[1]);
       cachedClient = c;
       cachedAddr = address;
       setClient(c);
       console.log('[XMTP] client ready, inboxId', c.inboxId);
+      // Ask other installations of this inbox to send us conversation history
+      // + consent state. Best-effort: requires a peer install to be online.
+      // https://docs.xmtp.org/chat-apps/list-stream-sync/history-sync
+      c.sendSyncRequest()
+        .then(() => c.syncAllDeviceSyncGroups())
+        .then((s) => console.log('[XMTP] history sync requested', s))
+        .catch((e) => console.warn('[XMTP] history sync request failed', e));
     } catch (e: any) {
       console.error('[XMTP] init failed', e);
       setError(e?.message ?? 'Failed to initialize XMTP');
@@ -64,10 +71,13 @@ export function useXmtpClient() {
       const n = await revokeAllInstallations(walletClient);
       console.log('[XMTP] revoked', n, 'installations; creating new client…');
       const signer = makeXmtpSigner(walletClient);
-      const c = await Client.create(signer, { env: XMTP_ENV, codecs: XMTP_CODECS } as Parameters<typeof Client.create>[1]);
+      const c = await Client.create(signer, { env: XMTP_ENV } as Parameters<typeof Client.create>[1]);
       cachedClient = c;
       cachedAddr = address ?? null;
       setClient(c);
+      c.sendSyncRequest()
+        .then(() => c.syncAllDeviceSyncGroups())
+        .catch((e) => console.warn('[XMTP] history sync (post-revoke) failed', e));
     } catch (e: any) {
       console.error('[XMTP] revoke+retry failed', e);
       setError(e?.message ?? 'Revoke failed');
