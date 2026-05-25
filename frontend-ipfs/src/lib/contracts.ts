@@ -1,4 +1,4 @@
-export const DMPAY_DIRECT_ADDRESS = '0xab2eF1B1A39D2dA7DaC2bCd16238CC1Ce5530C52' as const;
+export const DMPAY_DIRECT_ADDRESS = '0xAB2ef1b1A39D2DA7DAC2bCD16238cC1cE5530c52' as const;
 export const USDC_ADDRESS = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as const;
 
 export const dmpayDirectAbi = [
