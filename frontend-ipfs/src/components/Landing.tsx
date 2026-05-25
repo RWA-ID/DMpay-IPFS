@@ -164,7 +164,7 @@ export function Landing() {
               <h2 className="dm-display text-4xl sm:text-5xl mt-2 text-text-primary">Three steps. No middlemen.</h2>
             </div>
             <a
-              href="https://etherscan.io/address/0xa204f8242A535979821d96093238B5ccC268631E"
+              href="https://etherscan.io/address/0xAB2ef1b1A39D2DA7DAC2bCD16238cC1cE5530c52"
               target="_blank" rel="noreferrer"
               className="font-mono text-xs text-text-muted hover:text-text-primary"
             >

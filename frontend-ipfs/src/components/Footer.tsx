@@ -1,6 +1,6 @@
 import { ExternalLink } from 'lucide-react';
 
-const CONTRACT_ADDRESS = '0xa204f8242A535979821d96093238B5ccC268631E';
+const CONTRACT_ADDRESS = '0xAB2ef1b1A39D2DA7DAC2bCD16238cC1cE5530c52';
 
 export function Footer() {
   return (

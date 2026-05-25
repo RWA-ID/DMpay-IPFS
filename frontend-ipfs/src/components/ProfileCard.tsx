@@ -1,12 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import { useAccount, useEnsAddress, useEnsName, useEnsAvatar, useEnsText, useReadContract } from 'wagmi';
-import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { normalize } from 'viem/ens';
 import { isAddress, formatUnits, formatEther } from 'viem';
-import { Globe, AtSign, Code2, Send, Infinity as InfinityIcon, MessageCircle, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Globe, AtSign, Code2, Send, Infinity as InfinityIcon, MessageCircle, ShieldCheck, ArrowRight, AlertCircle } from 'lucide-react';
 import { Avatar } from './Avatar';
 import { ShareProfile } from './ShareProfile';
-import { DMPAY_DIRECT_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
+import { DMPAY_DIRECT_ADDRESS, DMPAY_DIRECT_V1_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 
 export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
   const navigate = useNavigate();
@@ -36,22 +35,32 @@ export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
     args: address ? [address] : undefined,
     query: { enabled: !!address },
   });
+  // V1 read — only used to detect stranded prices so we can prompt migration.
+  const { data: v1Price } = useReadContract({
+    address: DMPAY_DIRECT_V1_ADDRESS,
+    abi: dmpayDirectAbi,
+    functionName: 'priceOf',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
 
   const usdcPrice = price?.[0] ?? 0n;
   const ethPrice = price?.[1] ?? 0n;
   const lifetimeUsdc = price?.[2] ?? 0n;
   const lifetimeEth = price?.[3] ?? 0n;
   const hasAnyPrice = usdcPrice > 0n || ethPrice > 0n || lifetimeUsdc > 0n || lifetimeEth > 0n;
+  const hasV1Price = !!v1Price && (v1Price[0] > 0n || v1Price[1] > 0n || v1Price[2] > 0n || v1Price[3] > 0n);
+  const needsMigration = !hasAnyPrice && hasV1Price;
   const hasLifetime = lifetimeUsdc > 0n || lifetimeEth > 0n;
   const hasPerDM = usdcPrice > 0n || ethPrice > 0n;
 
   const { address: me, isConnected } = useAccount();
-  const { openConnectModal } = useConnectModal();
   const isSelf = me && address && me.toLowerCase() === address.toLowerCase();
 
-  function handleDM() {
-    if (!isConnected) { openConnectModal?.(); return; }
-    if (address) navigate(`/c/${address}`);
+  function handleDM(tier?: 'usdc' | 'eth' | 'lifetimeUsdc' | 'lifetimeEth') {
+    if (!address) return;
+    const qs = tier ? `?tier=${tier}` : '';
+    navigate(`/c/${address}${qs}`);
   }
 
   if (resolvingAddr) {
@@ -132,6 +141,7 @@ export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
                   sub="One-time. Opens an end-to-end encrypted 1:1."
                   priceUsdc={usdcPrice > 0n ? Number(formatUnits(usdcPrice, 6)) : null}
                   priceEth={ethPrice > 0n ? formatEther(ethPrice) : null}
+                  onClick={isSelf ? undefined : () => handleDM(usdcPrice > 0n ? 'usdc' : 'eth')}
                 />
               )}
               {hasLifetime && (
@@ -142,6 +152,7 @@ export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
                   sub="Unlimited DMs. Pay once, forever."
                   priceUsdc={lifetimeUsdc > 0n ? Number(formatUnits(lifetimeUsdc, 6)) : null}
                   priceEth={lifetimeEth > 0n ? formatEther(lifetimeEth) : null}
+                  onClick={isSelf ? undefined : () => handleDM(lifetimeUsdc > 0n ? 'lifetimeUsdc' : 'lifetimeEth')}
                 />
               )}
             </div>
@@ -156,6 +167,18 @@ export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
               </div>
             </div>
           </>
+        ) : needsMigration ? (
+          <div className="bg-amber-500/5 border border-amber-500/30 rounded-2xl p-4 flex gap-3">
+            <AlertCircle size={16} className="text-amber-400 shrink-0 mt-0.5" />
+            <div className="text-sm text-text-secondary">
+              <div className="text-text-primary font-medium mb-1">
+                {isSelf ? 'Re-set your prices on V2' : `${display}'s prices live on the old contract`}
+              </div>
+              {isSelf
+                ? "Your DMpay prices are stranded on contract V1. Visit Settings and Save prices to re-enable paid DMs on V2."
+                : `They set prices on DMpay V1, but the dapp now uses V2. They need to log in and re-call setPrice. You can still try to reach them off-platform.`}
+            </div>
+          </div>
         ) : (
           <div className="bg-bg-panel border border-border-subtle rounded-2xl p-4 text-sm text-text-secondary">
             {isSelf
@@ -169,12 +192,12 @@ export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
       <footer className="px-7 sm:px-10 py-6">
         {!isSelf ? (
           <button
-            onClick={handleDM}
+            onClick={() => handleDM()}
             disabled={!hasAnyPrice}
             className="w-full bg-brand hover:bg-brand-hover disabled:bg-bg-elevated disabled:text-text-muted text-brand-ink rounded-2xl py-4 flex items-center justify-center gap-2 font-medium transition-colors"
           >
             <Send size={16} />
-            {hasAnyPrice ? (isConnected ? `Pay to DM ${display}` : `Connect wallet to DM`) : `DMs not enabled`}
+            {hasAnyPrice ? (isConnected ? `Open chat with ${display}` : `Connect & open chat`) : `DMs not enabled`}
             {hasAnyPrice && <ArrowRight size={16} />}
           </button>
         ) : (
@@ -191,7 +214,7 @@ export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
 }
 
 function PriceCard({
-  icon, title, sub, priceUsdc, priceEth, featured = false,
+  icon, title, sub, priceUsdc, priceEth, featured = false, onClick,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -199,14 +222,18 @@ function PriceCard({
   priceUsdc: number | null;
   priceEth: string | null;
   featured?: boolean;
+  onClick?: () => void;
 }) {
+  const Tag: any = onClick ? 'button' : 'div';
   return (
-    <div
+    <Tag
+      onClick={onClick}
       className={[
-        'flex flex-col items-stretch gap-3 p-5 rounded-2xl text-left',
+        'flex flex-col items-stretch gap-3 p-5 rounded-2xl text-left transition-all',
         featured
           ? 'bg-brand text-brand-ink border border-brand shadow-card'
           : 'bg-bg-panel text-text-primary border border-border-subtle',
+        onClick ? (featured ? 'hover:brightness-110 active:scale-[0.99] cursor-pointer' : 'hover:border-brand hover:bg-bg-hover active:scale-[0.99] cursor-pointer') : '',
       ].join(' ')}
     >
       <div className="flex items-center justify-between">
@@ -246,7 +273,12 @@ function PriceCard({
           </span>
         )}
       </div>
-    </div>
+      {onClick && (
+        <div className={['mt-1 text-[11px] font-mono inline-flex items-center gap-1', featured ? 'text-brand-ink/70' : 'text-text-muted'].join(' ')}>
+          Select to continue →
+        </div>
+      )}
+    </Tag>
   );
 }
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { formatUnits, formatEther } from 'viem';
 import { Loader2, Infinity as InfinityIcon, Send, Check, AlertTriangle } from 'lucide-react';
@@ -51,6 +52,15 @@ export function Paywall({ recipient, recipientName, onUnlocked }: {
   }, [isUnlockedNow, onUnlocked]);
 
   const [selected, setSelected] = useState<Tier | null>(null);
+
+  // Pre-select the tier the user clicked on the profile card.
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const t = searchParams.get('tier');
+    if (!t || selected) return;
+    const valid: Tier[] = ['usdc', 'eth', 'lifetimeUsdc', 'lifetimeEth'];
+    if ((valid as string[]).includes(t)) setSelected(t as Tier);
+  }, [searchParams, selected]);
 
   if (loadingPrice || unlockedOutgoing === undefined || unlockedIncoming === undefined) {
     return <Centered><Loader2 className="animate-spin text-text-muted" /></Centered>;

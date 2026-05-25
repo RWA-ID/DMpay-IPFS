@@ -1,4 +1,7 @@
 export const DMPAY_DIRECT_ADDRESS = '0xAB2ef1b1A39D2DA7DAC2bCD16238cC1cE5530c52' as const;
+// V1 (deprecated). Read-only — used to detect users with stranded prices and
+// nudge them to re-set on V2. Never write to V1 from the dapp.
+export const DMPAY_DIRECT_V1_ADDRESS = '0xa204f8242A535979821d96093238B5ccC268631E' as const;
 export const USDC_ADDRESS = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as const;
 
 export const dmpayDirectAbi = [
