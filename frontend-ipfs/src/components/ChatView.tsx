@@ -19,7 +19,34 @@ export function ChatView() {
   const { client } = useXmtpClient();
   const [unlocked, setUnlocked] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [reachable, setReachable] = useState<boolean | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Reset per-recipient state when navigating between chats — React reuses the
+  // ChatView instance on route param change, so without this `unlocked` would
+  // leak across recipients and bypass the paywall.
+  useEffect(() => {
+    setUnlocked(false);
+    setReachable(null);
+  }, [address]);
+
+  // Pre-check XMTP reachability so we never show the paywall (and never
+  // charge) for a recipient who can't actually receive messages.
+  useEffect(() => {
+    if (!client || !address) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const map = await client.canMessage([ethIdentifier(address)]);
+        if (cancelled) return;
+        setReachable(map.get(address.toLowerCase()) === true);
+      } catch (e) {
+        console.warn('canMessage check failed', e);
+        if (!cancelled) setReachable(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [client, address]);
 
   const { data: ensName } = useEnsName({ address });
   const normalized = ensName ? safeNormalize(ensName) : undefined;
@@ -78,7 +105,7 @@ export function ChatView() {
   }
 
   return (
-    <main className="flex-1 flex flex-col bg-bg-base">
+    <main className="flex-1 flex flex-col bg-bg-base min-h-0">
       <header className="flex items-center gap-3 p-4 border-b border-border-subtle">
         <button
           onClick={() => navigate('/inbox')}
@@ -124,11 +151,27 @@ export function ChatView() {
         </div>
       </header>
 
-      {!unlocked ? (
-        <Paywall recipient={address} recipientName={display} onUnlocked={() => setUnlocked(true)} />
+      {reachable === false ? (
+        <UnreachableNotice recipientName={display} />
+      ) : !unlocked ? (
+        <Paywall key={address} recipient={address} recipientName={display} onUnlocked={() => setUnlocked(true)} />
       ) : (
-        <XmtpChat recipient={address} recipientName={display} />
+        <XmtpChat key={address} recipient={address} recipientName={display} />
       )}
+    </main>
+  );
+}
+
+function UnreachableNotice({ recipientName }: { recipientName: string }) {
+  return (
+    <main className="flex-1 flex flex-col items-center justify-center bg-bg-base text-center p-6">
+      <MessageSquare className="text-text-muted mb-3" size={28} />
+      <div className="text-text-primary font-medium mb-2">{recipientName} isn't on XMTP yet</div>
+      <div className="text-text-secondary text-sm max-w-sm">
+        They haven't activated end-to-end encrypted messaging on this address.
+        You can't pay or message them through DMpay until they sign in once
+        on any XMTP client (Converse, Coinbase Wallet, xmtp.chat).
+      </div>
     </main>
   );
 }

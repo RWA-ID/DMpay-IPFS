@@ -260,7 +260,7 @@ export function XmtpChat({ recipient, recipientName }: {
 
   return (
     <>
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-3">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-3">
         {messages.length === 0 && (
           <div className="text-center text-text-muted text-sm py-12">
             End-to-end encrypted. Say hello to {recipientName} 👋
