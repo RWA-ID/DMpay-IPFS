@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAccount, useEnsName, useEnsAvatar } from 'wagmi';
+import { useAccount, useEnsName, useEnsAvatar, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { normalize } from 'viem/ens';
-import { MoreHorizontal, MessageSquare, User, Ban, Copy, ExternalLink, ArrowLeft } from 'lucide-react';
+import { MoreHorizontal, MessageSquare, User, Ban, Copy, ExternalLink, ArrowLeft, XCircle, Loader2 } from 'lucide-react';
 import { ConsentState } from '@xmtp/browser-sdk';
 import { Avatar } from './Avatar';
 import { Paywall } from './Paywall';
 import { XmtpChat } from './XmtpChat';
 import { useXmtpClient } from '../hooks/useXmtpClient';
 import { ethIdentifier } from '../lib/xmtp';
+import { DMPAY_DIRECT_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 
 export function ChatView() {
   const { address } = useParams<{ address: `0x${string}` }>();
@@ -70,20 +71,57 @@ export function ChatView() {
   const display = ensName ?? `${address.slice(0, 6)}…${address.slice(-4)}`;
   const profilePath = ensName ? `/u/${ensName}` : `/u/${address}`;
 
-  async function blockAndClose() {
-    setMenuOpen(false);
-    if (!client || !address) { navigate('/'); return; }
-    try {
-      const dm = await client.conversations.fetchDmByIdentifier(ethIdentifier(address));
-      if (dm) {
-        await dm.updateConsentState(ConsentState.Denied);
+  // On-chain block / close write — V2 contract enforces them at the source.
+  // The XMTP consent flip is a belt-and-suspenders so blocked senders' future
+  // messages don't render even if their wallet bypasses the dapp.
+  const blockTx = useWriteContract();
+  const closeTx = useWriteContract();
+  const blockReceipt = useWaitForTransactionReceipt({ hash: blockTx.data });
+  const closeReceipt = useWaitForTransactionReceipt({ hash: closeTx.data });
+
+  useEffect(() => {
+    if (!blockReceipt.isSuccess || !client || !address) return;
+    (async () => {
+      try {
+        const dm = await client.conversations.fetchDmByIdentifier(ethIdentifier(address));
+        if (dm) await dm.updateConsentState(ConsentState.Denied);
+      } catch (e) {
+        console.warn('XMTP consent update failed (block already on-chain)', e);
+      } finally {
+        navigate('/');
       }
-    } catch (e) {
-      console.error('block failed', e);
-    } finally {
-      navigate('/');
-    }
+    })();
+  }, [blockReceipt.isSuccess, client, address, navigate]);
+
+  useEffect(() => {
+    if (!closeReceipt.isSuccess) return;
+    navigate('/inbox');
+  }, [closeReceipt.isSuccess, navigate]);
+
+  function blockAndClose() {
+    setMenuOpen(false);
+    if (!address) return;
+    blockTx.writeContract({
+      address: DMPAY_DIRECT_ADDRESS,
+      abi: dmpayDirectAbi,
+      functionName: 'blockSender',
+      args: [address],
+    });
   }
+
+  function closeConversation() {
+    setMenuOpen(false);
+    if (!address) return;
+    closeTx.writeContract({
+      address: DMPAY_DIRECT_ADDRESS,
+      abi: dmpayDirectAbi,
+      functionName: 'closeConversation',
+      args: [address],
+    });
+  }
+
+  const blocking = blockTx.isPending || blockReceipt.isLoading;
+  const closing = closeTx.isPending || closeReceipt.isLoading;
 
   async function copyAddress() {
     setMenuOpen(false);
@@ -143,8 +181,20 @@ export function ChatView() {
                 View on Etherscan
               </MenuItem>
               <div className="border-t border-border-subtle my-1.5" />
-              <MenuItem icon={<Ban size={16} />} onClick={blockAndClose} danger>
-                Block &amp; close conversation
+              <MenuItem
+                icon={closing ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
+                onClick={closeConversation}
+                disabled={closing || blocking}
+              >
+                {closing ? 'Closing on-chain…' : 'Close conversation'}
+              </MenuItem>
+              <MenuItem
+                icon={blocking ? <Loader2 size={16} className="animate-spin" /> : <Ban size={16} />}
+                onClick={blockAndClose}
+                disabled={blocking || closing}
+                danger
+              >
+                {blocking ? 'Blocking on-chain…' : 'Block & close conversation'}
               </MenuItem>
             </div>
           )}
@@ -176,17 +226,19 @@ function UnreachableNotice({ recipientName }: { recipientName: string }) {
   );
 }
 
-function MenuItem({ icon, onClick, children, danger }: {
+function MenuItem({ icon, onClick, children, danger, disabled }: {
   icon: React.ReactNode;
   onClick: () => void;
   children: React.ReactNode;
   danger?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       role="menuitem"
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-3.5 py-2 text-sm text-left transition-colors ${
+      disabled={disabled}
+      className={`w-full flex items-center gap-3 px-3.5 py-2 text-sm text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
         danger
           ? 'text-red-400 hover:bg-red-500/10'
           : 'text-text-primary hover:bg-bg-hover'

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
-import { formatUnits, formatEther, parseAbiItem } from 'viem';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { formatUnits, formatEther } from 'viem';
 import { Loader2, Infinity as InfinityIcon, Send, Check, AlertTriangle } from 'lucide-react';
 import { DMPAY_DIRECT_ADDRESS, USDC_ADDRESS, dmpayDirectAbi, erc20Abi } from '../lib/contracts';
 
@@ -12,7 +12,6 @@ export function Paywall({ recipient, recipientName, onUnlocked }: {
   onUnlocked: () => void;
 }) {
   const { address: me } = useAccount();
-  const publicClient = usePublicClient();
 
   // Read recipient prices
   const { data: price, isLoading: loadingPrice } = useReadContract({
@@ -27,66 +26,37 @@ export function Paywall({ recipient, recipientName, onUnlocked }: {
   const lEth = price?.[3] ?? 0n;
   const hasAnyPrice = usdc > 0n || eth > 0n || lUsdc > 0n || lEth > 0n;
 
-  // Lifetime pass: check both directions (either party having paid unlocks the chat)
-  const { data: hasPassOutgoing, refetch: refetchPass } = useReadContract({
+  // V2 single-source-of-truth: contract's isUnlocked combines lifetime, block,
+  // open timestamp, and close timestamp. Checks BOTH directions so either
+  // party having opened/holding a pass unlocks the thread.
+  const { data: unlockedOutgoing, refetch: refetchOutgoing } = useReadContract({
     address: DMPAY_DIRECT_ADDRESS,
     abi: dmpayDirectAbi,
-    functionName: 'hasLifetimePass',
+    functionName: 'isUnlocked',
     args: me ? [recipient, me] : undefined,
     query: { enabled: !!me },
   });
-  const { data: hasPassIncoming } = useReadContract({
+  const { data: unlockedIncoming } = useReadContract({
     address: DMPAY_DIRECT_ADDRESS,
     abi: dmpayDirectAbi,
-    functionName: 'hasLifetimePass',
+    functionName: 'isUnlocked',
     args: me ? [me, recipient] : undefined,
     query: { enabled: !!me },
   });
-  const hasPass = (hasPassOutgoing ?? false) || (hasPassIncoming ?? false);
+  const isUnlockedNow = (unlockedOutgoing ?? false) || (unlockedIncoming ?? false);
 
-  // Persistent unlock: localStorage cache + bounded on-chain backstop.
-  // A conversation is unlocked if EITHER party has paid (sender→recipient OR recipient→sender).
-  const storageKey = me ? `dmpay:open:${[me.toLowerCase(), recipient.toLowerCase()].sort().join(':')}` : '';
-  const [hasPriorOpen, setHasPriorOpen] = useState<boolean | null>(() => {
-    if (typeof window === 'undefined' || !storageKey) return null;
-    return localStorage.getItem(storageKey) === '1' ? true : null;
-  });
-
+  // Bubble up unlock to ChatView
   useEffect(() => {
-    if (!me || !publicClient || hasPriorOpen === true) return;
-    (async () => {
-      try {
-        const latest = await publicClient.getBlockNumber();
-        // publicnode caps eth_getLogs at 50k blocks per request.
-        const fromBlock = latest > 49_999n ? latest - 49_999n : 0n;
-        const event = parseAbiItem('event ConversationOpened(address indexed sender, address indexed recipient, address indexed token, uint256 amountPaid, uint256 fee)');
-        const [outgoing, incoming] = await Promise.all([
-          publicClient.getLogs({ address: DMPAY_DIRECT_ADDRESS, event, args: { sender: me, recipient }, fromBlock, toBlock: latest }),
-          publicClient.getLogs({ address: DMPAY_DIRECT_ADDRESS, event, args: { sender: recipient, recipient: me }, fromBlock, toBlock: latest }),
-        ]);
-        const paid = outgoing.length > 0 || incoming.length > 0;
-        setHasPriorOpen(paid);
-        if (paid && storageKey) localStorage.setItem(storageKey, '1');
-      } catch (e) {
-        console.error('event lookup failed', e);
-        setHasPriorOpen(false);
-      }
-    })();
-  }, [me, recipient, publicClient, hasPriorOpen, storageKey]);
-
-  // If already unlocked, bubble up immediately
-  useEffect(() => {
-    if (hasPass === true || hasPriorOpen === true) onUnlocked();
-  }, [hasPass, hasPriorOpen, onUnlocked]);
+    if (isUnlockedNow) onUnlocked();
+  }, [isUnlockedNow, onUnlocked]);
 
   const [selected, setSelected] = useState<Tier | null>(null);
 
-  if (loadingPrice || hasPassOutgoing === undefined || hasPassIncoming === undefined || hasPriorOpen === null) {
+  if (loadingPrice || unlockedOutgoing === undefined || unlockedIncoming === undefined) {
     return <Centered><Loader2 className="animate-spin text-text-muted" /></Centered>;
   }
 
-  if (hasPass || hasPriorOpen) {
-    // Will navigate via effect; render nothing visible
+  if (isUnlockedNow) {
     return null;
   }
 
@@ -167,8 +137,7 @@ export function Paywall({ recipient, recipientName, onUnlocked }: {
               lEth
             }
             onPaid={() => {
-              if (storageKey) localStorage.setItem(storageKey, '1');
-              refetchPass();
+              refetchOutgoing();
               onUnlocked();
             }}
           />

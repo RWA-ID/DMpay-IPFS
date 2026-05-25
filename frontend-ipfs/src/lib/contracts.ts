@@ -1,4 +1,4 @@
-export const DMPAY_DIRECT_ADDRESS = '0xa204f8242A535979821d96093238B5ccC268631E' as const;
+export const DMPAY_DIRECT_ADDRESS = '0xab2eF1B1A39D2dA7DaC2bCd16238CC1Ce5530C52' as const;
 export const USDC_ADDRESS = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as const;
 
 export const dmpayDirectAbi = [
@@ -38,6 +38,22 @@ export const dmpayDirectAbi = [
     inputs: [{ name: 'id', type: 'uint256' }, { name: 'xmtpGroupId', type: 'bytes32' }], outputs: [] },
   { type: 'function', name: 'closeGroup', stateMutability: 'nonpayable',
     inputs: [{ name: 'id', type: 'uint256' }], outputs: [] },
+  { type: 'function', name: 'removeGroupMember', stateMutability: 'nonpayable',
+    inputs: [{ name: 'id', type: 'uint256' }, { name: 'member', type: 'address' }], outputs: [] },
+
+  // V2: receiver-side block / close + helper read
+  { type: 'function', name: 'isUnlocked', stateMutability: 'view',
+    inputs: [{ name: 'recipient', type: 'address' }, { name: 'sender', type: 'address' }],
+    outputs: [{ type: 'bool' }] },
+  { type: 'function', name: 'blockedSenders', stateMutability: 'view',
+    inputs: [{ name: 'recipient', type: 'address' }, { name: 'sender', type: 'address' }],
+    outputs: [{ type: 'bool' }] },
+  { type: 'function', name: 'blockSender', stateMutability: 'nonpayable',
+    inputs: [{ name: 'sender', type: 'address' }], outputs: [] },
+  { type: 'function', name: 'unblockSender', stateMutability: 'nonpayable',
+    inputs: [{ name: 'sender', type: 'address' }], outputs: [] },
+  { type: 'function', name: 'closeConversation', stateMutability: 'nonpayable',
+    inputs: [{ name: 'sender', type: 'address' }], outputs: [] },
 ] as const;
 
 export const erc20Abi = [
