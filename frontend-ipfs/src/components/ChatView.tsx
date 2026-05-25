@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAccount, useEnsName, useEnsAvatar } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { normalize } from 'viem/ens';
-import { MoreHorizontal, MessageSquare, User, Ban, Copy, ExternalLink } from 'lucide-react';
+import { MoreHorizontal, MessageSquare, User, Ban, Copy, ExternalLink, ArrowLeft } from 'lucide-react';
 import { ConsentState } from '@xmtp/browser-sdk';
 import { Avatar } from './Avatar';
 import { Paywall } from './Paywall';
@@ -80,6 +80,13 @@ export function ChatView() {
   return (
     <main className="flex-1 flex flex-col bg-bg-base">
       <header className="flex items-center gap-3 p-4 border-b border-border-subtle">
+        <button
+          onClick={() => navigate('/inbox')}
+          className="md:hidden p-2 -ml-2 text-text-secondary hover:text-text-primary rounded-lg hover:bg-bg-hover"
+          aria-label="Back to inbox"
+        >
+          <ArrowLeft size={20} />
+        </button>
         <Avatar src={avatar || undefined} fallback={display[0]} online size={40} />
         <div className="flex-1 min-w-0">
           <div className="font-semibold truncate">{display}</div>

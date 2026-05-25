@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Search, Plus, MessageSquare, Loader2, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useEnsName, useEnsAvatar, useEnsAddress } from 'wagmi';
+import { useAccount, useEnsName, useEnsAvatar, useEnsAddress } from 'wagmi';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { normalize } from 'viem/ens';
 import { isAddress } from 'viem';
 import { ConsentState, type Dm, type DecodedMessage } from '@xmtp/browser-sdk';
@@ -14,10 +15,12 @@ type Row = {
   lastMessage: DecodedMessage<unknown> | null;
 };
 
-export function ChatList() {
+export function ChatList({ className = '' }: { className?: string }) {
   const navigate = useNavigate();
   const { address: activeAddr } = useParams();
-  const { client } = useXmtpClient();
+  const { isConnected } = useAccount();
+  const { openConnectModal } = useConnectModal();
+  const { client, init, initializing, error } = useXmtpClient();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [searching, setSearching] = useState(false);
 
@@ -60,8 +63,46 @@ export function ChatList() {
     return () => { cancelled = true; };
   }, [client]);
 
+  // Pre-XMTP states: wallet not connected, or wallet connected but no XMTP signature yet
+  if (!isConnected) {
+    return (
+      <div className={`${className} bg-bg-panel border-r border-border-subtle flex flex-col items-center justify-center p-6 text-center`}>
+        <MessageSquare className="text-brand mb-3" size={24} />
+        <div className="text-text-primary font-medium mb-1">Connect your wallet</div>
+        <div className="text-text-secondary text-xs mb-4">Sign in to see your DMpay chats.</div>
+        <button onClick={() => openConnectModal?.()} className="bg-brand hover:bg-brand-hover text-brand-ink rounded-xl px-5 py-2 text-sm font-medium">
+          Connect wallet
+        </button>
+      </div>
+    );
+  }
+
+  if (!client) {
+    return (
+      <div className={`${className} bg-bg-panel border-r border-border-subtle flex flex-col items-center justify-center p-6 text-center`}>
+        {initializing ? (
+          <>
+            <Loader2 className="animate-spin text-brand mb-3" size={20} />
+            <div className="text-text-primary font-medium mb-1">Connecting to XMTP…</div>
+            <div className="text-text-secondary text-xs">Check your wallet for a signature.</div>
+          </>
+        ) : (
+          <>
+            <MessageSquare className="text-brand mb-3" size={24} />
+            <div className="text-text-primary font-medium mb-1">Enable messaging</div>
+            <div className="text-text-secondary text-xs mb-4">Sign once with your wallet to load your chats.</div>
+            {error && <div className="text-red-400 text-[11px] mb-3 max-w-[12rem]">{error}</div>}
+            <button onClick={() => init()} className="bg-brand hover:bg-brand-hover text-brand-ink rounded-xl px-5 py-2 text-sm font-medium">
+              Connect XMTP
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="w-80 bg-bg-panel border-r border-border-subtle flex flex-col">
+    <div className={`${className} bg-bg-panel border-r border-border-subtle flex flex-col`}>
       <div className="p-4 space-y-3">
         {searching ? (
           <NewChatSearch onClose={() => setSearching(false)} onSelect={(addr) => { setSearching(false); navigate(`/c/${addr}`); }} />

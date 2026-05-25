@@ -7,6 +7,9 @@
 
 html, body, #root {
   height: 100%;
+  /* Use dynamic viewport height on mobile so the URL bar / keyboard shrink
+     the viewport gracefully and the chat composer stays reachable. */
+  min-height: 100dvh;
   margin: 0;
   background: #0B0B0A;
   color: #F2F0E8;

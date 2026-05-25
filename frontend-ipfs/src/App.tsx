@@ -47,8 +47,8 @@ function Shell() {
       <div className="flex-1 flex overflow-hidden">
         {inChat ? (
           <>
-            <Sidebar />
-            <ChatList />
+            <div className="hidden md:flex"><Sidebar /></div>
+            <ChatList className="hidden md:flex w-80" />
             <Routes>
               <Route path="/c/:address" element={<ChatView />} />
             </Routes>
