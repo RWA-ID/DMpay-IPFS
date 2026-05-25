@@ -4,7 +4,7 @@ import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { normalize } from 'viem/ens';
 import { parseUnits, parseEther, formatUnits, formatEther } from 'viem';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Loader2, CheckCircle2, Coins, Infinity as InfinityIcon } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, CheckCircle2, Coins, Infinity as InfinityIcon, AlertCircle } from 'lucide-react';
 import { Avatar } from './Avatar';
 import { DMPAY_DIRECT_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 
@@ -38,8 +38,9 @@ export function Settings() {
     }
   }, [price]);
 
-  const { writeContract, data: txHash, isPending } = useWriteContract();
-  const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+  const { writeContract, data: txHash, isPending, error: writeError, reset: resetWrite } = useWriteContract();
+  const { isLoading: confirming, isSuccess, error: receiptError } = useWaitForTransactionReceipt({ hash: txHash });
+  const error = writeError ?? receiptError;
 
   useEffect(() => {
     if (isSuccess && address) {
@@ -51,6 +52,7 @@ export function Settings() {
 
   function save() {
     if (!address) return;
+    resetWrite();
     const args: [bigint, bigint, bigint, bigint] = [
       usdc ? parseUnits(usdc, 6) : 0n,
       eth ? parseEther(eth) : 0n,
@@ -143,6 +145,15 @@ export function Settings() {
           <div className="text-xs text-text-muted">
             Set any field to <code className="text-text-secondary">0</code> or leave blank to disable that token. Protocol fee: 2.5%.
           </div>
+
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-xs rounded-xl px-3 py-2.5 flex items-start gap-2">
+              <AlertCircle size={14} className="shrink-0 mt-0.5" />
+              <div className="flex-1 break-words">
+                {(error as any)?.shortMessage ?? error?.message ?? String(error)}
+              </div>
+            </div>
+          )}
 
           <button
             onClick={save}

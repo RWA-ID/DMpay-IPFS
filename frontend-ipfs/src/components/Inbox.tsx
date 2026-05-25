@@ -21,6 +21,14 @@ export function Inbox() {
   const [reloadKey, setReloadKey] = useState(0);
   const navigate = useNavigate();
 
+  // Go to Landing and scroll to the "Find anyone" search section.
+  // Use sessionStorage so the landing page can pick up the intent
+  // post-navigation (HashRouter URL hashes conflict with anchors).
+  function goFindSomeone() {
+    sessionStorage.setItem('dmpay:scrollToSearch', '1');
+    navigate('/');
+  }
+
   useEffect(() => {
     if (!client) return;
     let cancelled = false;
@@ -104,7 +112,7 @@ export function Inbox() {
               <RefreshCw size={12} /> Resync
             </button>
             <button
-              onClick={() => navigate('/')}
+              onClick={() => goFindSomeone()}
               className="bg-brand hover:bg-brand-hover text-brand-ink rounded-full px-4 py-2 text-sm font-medium"
             >
               + New chat
@@ -130,7 +138,7 @@ export function Inbox() {
               XMTP threads are bound to the installation that created them. If you revoked your previous installation,
               older history won't reappear here — the messages still exist on-network for the other inboxId.
             </div>
-            <button onClick={() => navigate('/')} className="mt-5 bg-brand hover:bg-brand-hover text-brand-ink rounded-2xl px-5 py-2.5 font-medium text-sm">Find someone</button>
+            <button onClick={() => goFindSomeone()} className="mt-5 bg-brand hover:bg-brand-hover text-brand-ink rounded-2xl px-5 py-2.5 font-medium text-sm">Find someone</button>
           </div>
         )}
 

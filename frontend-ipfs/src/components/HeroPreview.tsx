@@ -1,7 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import { useEnsAddress, useEnsAvatar, useEnsText, useReadContract } from 'wagmi';
-import { useConnectModal } from '@rainbow-me/rainbowkit';
-import { useAccount } from 'wagmi';
 import { normalize } from 'viem/ens';
 import { formatUnits, formatEther } from 'viem';
 import { ArrowRight, ShieldCheck, MessageCircle, Infinity as InfinityIcon } from 'lucide-react';
@@ -10,8 +8,6 @@ import { DMPAY_DIRECT_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 
 export function HeroPreview({ ensName }: { ensName: string }) {
   const navigate = useNavigate();
-  const { isConnected } = useAccount();
-  const { openConnectModal } = useConnectModal();
   const normalized = safeNormalize(ensName);
 
   const { data: address } = useEnsAddress({ name: normalized, query: { enabled: !!normalized } });
@@ -32,9 +28,11 @@ export function HeroPreview({ ensName }: { ensName: string }) {
   const hasPrice = usdc > 0n || eth > 0n;
   const hasLifetime = lifeUsdc > 0n || lifeEth > 0n;
 
+  // Always navigate straight to /c/<address> — ChatView handles the
+  // "not connected → connect" prompt itself so users don't lose their place.
   const onPay = () => {
-    if (!isConnected) { openConnectModal?.(); return; }
     if (address) navigate(`/c/${address}`);
+    else navigate(`/u/${ensName}`); // fallback while ENS still resolving
   };
 
   const ctaLabel = hasPrice

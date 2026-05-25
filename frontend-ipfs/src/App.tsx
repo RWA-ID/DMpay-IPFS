@@ -13,6 +13,7 @@ import { Settings } from './components/Settings';
 import { Inbox } from './components/Inbox';
 import { Discover } from './components/Discover';
 import { XmtpAutoInit } from './components/XmtpAutoInit';
+import { CreateGroup } from './components/CreateGroup';
 
 const queryClient = new QueryClient();
 
@@ -60,22 +61,11 @@ function Shell() {
             <Route path="/discover" element={<Discover />} />
             <Route path="/inbox" element={<Inbox />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/groups/new" element={<Placeholder title="Create paid group" />} />
+            <Route path="/groups/new" element={<CreateGroup />} />
           </Routes>
         )}
       </div>
     </div>
-  );
-}
-
-function Placeholder({ title }: { title: string }) {
-  return (
-    <main className="flex-1 flex items-center justify-center bg-bg-base text-text-secondary">
-      <div className="text-center">
-        <div className="text-lg font-medium text-text-primary mb-2">{title}</div>
-        <div className="text-sm">Coming next.</div>
-      </div>
-    </main>
   );
 }
 
