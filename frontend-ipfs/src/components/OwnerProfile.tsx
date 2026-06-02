@@ -5,6 +5,7 @@ import { normalize } from 'viem/ens';
 import { parseAbiItem, formatUnits, formatEther } from 'viem';
 import { Globe, AtSign, Code2, Settings as SettingsIcon, MessageCircle, Infinity as InfinityIcon, ShieldCheck, ExternalLink, Loader2, BadgePlus, Pencil, X } from 'lucide-react';
 import { Avatar } from './Avatar';
+import { EfpChip } from './EfpStats';
 import { ShareProfile } from './ShareProfile';
 import { EnsRegister } from './EnsRegister';
 import { EnsRecordsEditor } from './EnsRecordsEditor';
@@ -116,6 +117,9 @@ export function OwnerProfile({ address }: { address: `0x${string}` }) {
                 <h1 className="dm-display text-5xl sm:text-[72px] text-text-primary truncate">{display}</h1>
                 <div className="font-mono text-xs text-text-muted mt-2">
                   {address.slice(0, 6)}…{address.slice(-4)}
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-4 empty:mt-0">
+                  <EfpChip idOrAddress={ensName ?? address} />
                 </div>
                 {(url || twitter || github) && (
                   <div className="flex flex-wrap gap-1.5 mt-4">

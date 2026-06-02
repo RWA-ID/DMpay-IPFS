@@ -4,6 +4,7 @@ import { normalize } from 'viem/ens';
 import { isAddress, formatUnits, formatEther } from 'viem';
 import { Globe, AtSign, Code2, Send, Infinity as InfinityIcon, MessageCircle, ShieldCheck, ArrowRight, AlertCircle } from 'lucide-react';
 import { Avatar } from './Avatar';
+import { EfpChip } from './EfpStats';
 import { ShareProfile } from './ShareProfile';
 import { DMPAY_DIRECT_ADDRESS, DMPAY_DIRECT_V1_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 
@@ -87,8 +88,11 @@ export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
               {display}
             </h1>
             <div className="font-mono text-xs text-text-muted mt-2 truncate">{shortAddr}</div>
+            <div className="flex flex-wrap gap-1.5 mt-4 empty:mt-0">
+              <EfpChip idOrAddress={ensName ?? address} />
+            </div>
             {(url || twitter || github) && (
-              <div className="flex flex-wrap gap-1.5 mt-4">
+              <div className="flex flex-wrap gap-1.5 mt-2">
                 {url && (
                   <a href={String(url)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 bg-chip text-chip-ink text-[11px] font-medium px-2.5 py-1 rounded-full">
                     <Globe size={11} /> {String(url).replace(/^https?:\/\//, '').slice(0, 28)}
