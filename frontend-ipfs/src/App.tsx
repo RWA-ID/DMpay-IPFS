@@ -1,7 +1,8 @@
-import { WagmiProvider } from 'wagmi';
+import { useEffect, useRef } from 'react';
+import { WagmiProvider, useAccount } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
-import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { config } from './lib/wagmi';
 import { TopBar } from './components/TopBar';
 import { Sidebar } from './components/Sidebar';
@@ -23,9 +24,9 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider
           theme={darkTheme({
-            accentColor: '#7c5cff',
-            accentColorForeground: 'white',
-            borderRadius: 'medium',
+            accentColor: '#F2F0E8',
+            accentColorForeground: '#0B0B0A',
+            borderRadius: 'large',
           })}
         >
           <HashRouter>
@@ -39,7 +40,19 @@ function App() {
 
 function Shell() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { address, isConnected } = useAccount();
   const inChat = location.pathname.startsWith('/c/');
+
+  // Profile-first onboarding: when a user connects from the landing page,
+  // take them to their own profile (where pricing + ENS setup live).
+  const wasConnected = useRef(isConnected);
+  useEffect(() => {
+    if (isConnected && !wasConnected.current && address && location.pathname === '/') {
+      navigate(`/u/${address}`);
+    }
+    wasConnected.current = isConnected;
+  }, [isConnected, address, location.pathname, navigate]);
 
   return (
     <div className="h-full flex flex-col">

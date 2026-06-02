@@ -1,16 +1,12 @@
-import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount, useEnsName, useEnsAvatar } from 'wagmi';
+import { useAccount } from 'wagmi';
 import { useNavigate } from 'react-router-dom';
-import { normalize } from 'viem/ens';
 import { Inbox as InboxIcon, Loader2, CheckCircle2, Zap, AlertTriangle } from 'lucide-react';
-import { Avatar } from './Avatar';
+import { ConnectControl } from './ConnectControl';
 import { useXmtpClient } from '../hooks/useXmtpClient';
 import { useState } from 'react';
 
 export function TopBar() {
-  const { address, isConnected } = useAccount();
-  const { data: ensName } = useEnsName({ address });
-  const { data: avatar } = useEnsAvatar({ name: ensName ? safeNormalize(ensName) : undefined });
+  const { isConnected } = useAccount();
   const navigate = useNavigate();
   const { client, init, initializing, error, revokeAndRetry, needsRevoke } = useXmtpClient();
   const [showErr, setShowErr] = useState(false);
@@ -71,22 +67,10 @@ export function TopBar() {
                 {initializing ? 'Connecting…' : 'Connect XMTP'}
               </button>
             )}
-            <button
-              onClick={() => navigate(`/u/${ensName ?? address}`)}
-              title="View my profile"
-              className="flex items-center gap-2 bg-bg-elevated hover:bg-bg-hover rounded-full pl-1 pr-3 py-1 transition-colors"
-            >
-              <Avatar src={avatar || undefined} fallback={ensName?.[0] || address?.[2]} size={24} />
-              <span className="text-sm text-text-primary">{ensName ?? `${address?.slice(0, 6)}…${address?.slice(-4)}`}</span>
-            </button>
           </>
         )}
-        <ConnectButton showBalance={false} accountStatus="address" chainStatus="none" />
+        <ConnectControl />
       </div>
     </header>
   );
-}
-
-function safeNormalize(name: string) {
-  try { return normalize(name); } catch { return undefined; }
 }

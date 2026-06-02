@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { isAddress } from 'viem';
 import { useAccount } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
@@ -27,15 +27,6 @@ export function Landing() {
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setTimeout(() => document.getElementById('search-input')?.focus(), 350);
   };
-
-  // Honor "Find someone" requests forwarded from /inbox (and anywhere else).
-  useEffect(() => {
-    if (sessionStorage.getItem('dmpay:scrollToSearch') === '1') {
-      sessionStorage.removeItem('dmpay:scrollToSearch');
-      // Defer one tick so the search section is mounted.
-      requestAnimationFrame(() => scrollToSearch());
-    }
-  }, []);
 
   return (
     <main className="flex-1 overflow-y-auto bg-bg-base">

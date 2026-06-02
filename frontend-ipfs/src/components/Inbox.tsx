@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEnsName, useEnsAvatar } from 'wagmi';
 import { normalize } from 'viem/ens';
-import { Loader2, MessageSquare, Inbox as InboxIcon, Zap, RefreshCw } from 'lucide-react';
+import { isAddress } from 'viem';
+import { Loader2, MessageSquare, Inbox as InboxIcon, Zap, RefreshCw, Search } from 'lucide-react';
 import type { Dm, DecodedMessage } from '@xmtp/browser-sdk';
 import { ConsentState } from '@xmtp/browser-sdk';
 import { useXmtpClient } from '../hooks/useXmtpClient';
@@ -20,14 +21,6 @@ export function Inbox() {
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const navigate = useNavigate();
-
-  // Go to Landing and scroll to the "Find anyone" search section.
-  // Use sessionStorage so the landing page can pick up the intent
-  // post-navigation (HashRouter URL hashes conflict with anchors).
-  function goFindSomeone() {
-    sessionStorage.setItem('dmpay:scrollToSearch', '1');
-    navigate('/');
-  }
 
   useEffect(() => {
     if (!client) return;
@@ -111,14 +104,10 @@ export function Inbox() {
             >
               <RefreshCw size={12} /> Resync
             </button>
-            <button
-              onClick={() => goFindSomeone()}
-              className="bg-brand hover:bg-brand-hover text-brand-ink rounded-full px-4 py-2 text-sm font-medium"
-            >
-              + New chat
-            </button>
           </div>
         </div>
+
+        <InboxSearch onSubmit={(v) => navigate(`/u/${v}`)} className="mt-6" />
 
         {error && (
           <div className="mt-6 bg-bg-panel border border-danger/30 text-danger rounded-2xl p-4 text-sm">{error}</div>
@@ -138,7 +127,7 @@ export function Inbox() {
               XMTP threads are bound to the installation that created them. If you revoked your previous installation,
               older history won't reappear here — the messages still exist on-network for the other inboxId.
             </div>
-            <button onClick={() => goFindSomeone()} className="mt-5 bg-brand hover:bg-brand-hover text-brand-ink rounded-2xl px-5 py-2.5 font-medium text-sm">Find someone</button>
+            <InboxSearch onSubmit={(v) => navigate(`/u/${v}`)} className="mt-6 max-w-md mx-auto text-left" autoFocus />
           </div>
         )}
 
@@ -182,6 +171,41 @@ function InboxRow({ row, onOpen }: { row: Row; onOpen: (addr: string) => void })
         <div className="text-sm text-text-secondary truncate mt-1">{preview || 'No messages yet'}</div>
       </div>
     </button>
+  );
+}
+
+function InboxSearch({ onSubmit, className = '', autoFocus = false }: { onSubmit: (value: string) => void; className?: string; autoFocus?: boolean }) {
+  const [query, setQuery] = useState('');
+  const trimmed = query.trim().toLowerCase();
+  const isEns = trimmed.endsWith('.eth') || (trimmed.includes('.') && !trimmed.startsWith('0x'));
+  const valid = isEns || isAddress(trimmed);
+
+  return (
+    <form
+      onSubmit={(e) => { e.preventDefault(); if (valid) onSubmit(trimmed); }}
+      className={className}
+    >
+      <div className="flex items-center bg-bg-elevated border border-border-subtle rounded-2xl pl-4 pr-2 py-2 focus-within:ring-1 focus-within:ring-brand">
+        <Search size={16} className="text-text-muted shrink-0" />
+        <input
+          autoFocus={autoFocus}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Start a new chat — vitalik.eth or 0x…"
+          className="flex-1 bg-transparent text-text-primary placeholder:text-text-muted text-[15px] px-3 py-1 focus:outline-none font-mono"
+        />
+        <button
+          type="submit"
+          disabled={!valid}
+          className="bg-brand hover:bg-brand-hover disabled:bg-bg-hover disabled:text-text-muted text-brand-ink rounded-xl px-4 py-2 text-sm font-medium transition-colors"
+        >
+          Go
+        </button>
+      </div>
+      {query && !valid && (
+        <div className="text-text-muted text-xs mt-2 font-mono">Type a full ENS name or 0x address.</div>
+      )}
+    </form>
   );
 }
 

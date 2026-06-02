@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useEnsName, useEnsAvatar, useEnsText, useReadContract, usePublicClient } from 'wagmi';
 import { normalize } from 'viem/ens';
 import { parseAbiItem, formatUnits, formatEther } from 'viem';
-import { Globe, AtSign, Code2, Settings as SettingsIcon, MessageCircle, Infinity as InfinityIcon, ShieldCheck, ExternalLink, Loader2 } from 'lucide-react';
+import { Globe, AtSign, Code2, Settings as SettingsIcon, MessageCircle, Infinity as InfinityIcon, ShieldCheck, ExternalLink, Loader2, BadgePlus, Pencil, X } from 'lucide-react';
 import { Avatar } from './Avatar';
 import { ShareProfile } from './ShareProfile';
+import { EnsRegister } from './EnsRegister';
+import { EnsRecordsEditor } from './EnsRecordsEditor';
 import { DMPAY_DIRECT_ADDRESS, USDC_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 
 type SupporterRow = {
@@ -20,9 +22,10 @@ export function OwnerProfile({ address }: { address: `0x${string}` }) {
   const navigate = useNavigate();
   const publicClient = usePublicClient();
 
-  const { data: ensName } = useEnsName({ address });
+  const { data: ensName, refetch: refetchEnsName } = useEnsName({ address });
   const normalized = ensName ? safeNormalize(ensName) : undefined;
-  const { data: avatar } = useEnsAvatar({ name: normalized, query: { enabled: !!normalized } });
+  const { data: avatar, refetch: refetchAvatar } = useEnsAvatar({ name: normalized, query: { enabled: !!normalized } });
+  const [panel, setPanel] = useState<'none' | 'register' | 'records'>('none');
   const { data: description } = useEnsText({ name: normalized, key: 'description', query: { enabled: !!normalized } });
   const { data: url } = useEnsText({ name: normalized, key: 'url', query: { enabled: !!normalized } });
   const { data: twitter } = useEnsText({ name: normalized, key: 'com.twitter', query: { enabled: !!normalized } });
@@ -135,13 +138,39 @@ export function OwnerProfile({ address }: { address: `0x${string}` }) {
                 )}
               </div>
             </div>
-            <button
-              onClick={() => navigate('/settings')}
-              className="bg-bg-panel hover:bg-bg-hover border border-border-strong text-text-primary rounded-2xl px-5 py-3 font-medium inline-flex items-center gap-2 self-start md:self-end"
-            >
-              <SettingsIcon size={14} /> Edit profile & pricing
-            </button>
+            <div className="flex flex-wrap gap-2 self-start md:self-end">
+              {!ensName ? (
+                <button
+                  onClick={() => setPanel('register')}
+                  className="bg-brand hover:bg-brand-hover text-brand-ink rounded-2xl px-5 py-3 font-medium inline-flex items-center gap-2"
+                >
+                  <BadgePlus size={14} /> Register ENS name
+                </button>
+              ) : (
+                <button
+                  onClick={() => setPanel('records')}
+                  className="bg-bg-panel hover:bg-bg-hover border border-border-strong text-text-primary rounded-2xl px-5 py-3 font-medium inline-flex items-center gap-2"
+                >
+                  <Pencil size={14} /> Edit records & avatar
+                </button>
+              )}
+              <button
+                onClick={() => navigate('/settings')}
+                className="bg-bg-panel hover:bg-bg-hover border border-border-strong text-text-primary rounded-2xl px-5 py-3 font-medium inline-flex items-center gap-2"
+              >
+                <SettingsIcon size={14} /> Edit pricing
+              </button>
+            </div>
           </div>
+
+          {!ensName && (
+            <div className="mt-6 bg-bg-panel border border-border-subtle rounded-2xl p-4 flex items-start gap-3">
+              <BadgePlus size={16} className="text-text-primary mt-0.5 shrink-0" />
+              <div className="text-sm text-text-secondary">
+                <span className="text-text-primary font-medium">Get an ENS name for discovery.</span> A name like <span className="font-mono">yourname.eth</span> becomes your shareable DMpay link and lets people find you. Register one in a couple of taps.
+              </div>
+            </div>
+          )}
 
           {description && (
             <p className="text-lg text-text-secondary mt-7 max-w-2xl leading-relaxed">{String(description)}</p>
@@ -264,7 +293,47 @@ export function OwnerProfile({ address }: { address: `0x${string}` }) {
           </aside>
         </div>
       </article>
+
+      {panel !== 'none' && (
+        <EnsModal
+          title={panel === 'register' ? 'Register an ENS name' : 'Edit records & avatar'}
+          onClose={() => setPanel('none')}
+        >
+          {panel === 'register' ? (
+            <EnsRegister
+              address={address}
+              onRegistered={() => { refetchEnsName(); setPanel('none'); }}
+            />
+          ) : ensName ? (
+            <EnsRecordsEditor
+              name={ensName}
+              address={address}
+              initialAvatarUrl={avatar || undefined}
+              onSaved={() => { refetchAvatar(); refetchEnsName(); setPanel('none'); }}
+            />
+          ) : null}
+        </EnsModal>
+      )}
     </main>
+  );
+}
+
+function EnsModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
+      <div className="bg-bg-panel border border-border-subtle rounded-3xl shadow-pop w-full max-w-lg my-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle">
+          <h2 className="dm-display text-2xl text-text-primary">{title}</h2>
+          <button onClick={onClose} className="text-text-muted hover:text-text-primary rounded-full p-1.5 hover:bg-bg-elevated"><X size={18} /></button>
+        </div>
+        <div className="px-6 py-6">{children}</div>
+      </div>
+    </div>
   );
 }
 

@@ -6,6 +6,12 @@ import { makeXmtpSigner, revokeAllInstallations, XMTP_ENV } from '../lib/xmtp';
 let cachedClient: Client<unknown> | null = null;
 let cachedAddr: string | null = null;
 
+/** Drop the in-memory XMTP client (e.g. on wallet disconnect). */
+export function resetXmtpClient() {
+  cachedClient = null;
+  cachedAddr = null;
+}
+
 export function useXmtpClient() {
   const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
@@ -52,9 +58,9 @@ export function useXmtpClient() {
     }
   }, [address, walletClient]);
 
-  // Auto-clear if wallet changes
+  // Auto-clear if the wallet changes account or disconnects entirely.
   useEffect(() => {
-    if (cachedAddr && address && cachedAddr.toLowerCase() !== address.toLowerCase()) {
+    if (cachedAddr && (!address || cachedAddr.toLowerCase() !== address.toLowerCase())) {
       cachedClient = null;
       cachedAddr = null;
       setClient(null);
