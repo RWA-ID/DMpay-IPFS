@@ -1,64 +1,89 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { usePublicClient, useEnsName, useEnsAvatar, useEnsText, useReadContract } from 'wagmi';
-import { parseAbiItem, formatUnits, formatEther } from 'viem';
+import { useEnsName, useEnsAvatar, useEnsText } from 'wagmi';
+import {
+  createPublicClient, fallback, http, parseAbiItem, formatUnits, formatEther,
+} from 'viem';
+import { mainnet } from 'viem/chains';
 import { normalize } from 'viem/ens';
 import { ArrowRight, Loader2, Search } from 'lucide-react';
 import { Footer } from './Footer';
 import { Avatar } from './Avatar';
-import { DMPAY_DIRECT_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
+import { DMPAY_DIRECT_ADDRESS } from '../lib/contracts';
 
-type Creator = { address: `0x${string}`; lastSeenBlock: bigint; openCount: number };
+// V2 deployment block — start of all PriceSet history.
+const DMPAY_V2_DEPLOY_BLOCK = 25169356n;
+
+// Dedicated client for the eth_getLogs scan. The app's default RPC
+// (publicnode) rejects wide log ranges as "archive". These public
+// endpoints serve full-range getLogs without an API key.
+const logsClient = createPublicClient({
+  chain: mainnet,
+  transport: fallback([
+    http('https://gateway.tenderly.co/public/mainnet'),
+    http('https://eth.api.onfinality.io/public'),
+  ]),
+});
+
+const priceSetEvent = parseAbiItem(
+  'event PriceSet(address indexed user, uint256 usdc, uint256 eth, uint256 lifetimeUsdc, uint256 lifetimeEth)'
+);
+
+type Creator = {
+  address: `0x${string}`;
+  lastSeenBlock: bigint;
+  usdc: bigint;
+  eth: bigint;
+  lifetimeUsdc: bigint;
+  lifetimeEth: bigint;
+};
 
 export function Discover() {
-  const publicClient = usePublicClient();
   const navigate = useNavigate();
   const [creators, setCreators] = useState<Creator[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!publicClient) return;
     let cancelled = false;
     (async () => {
       try {
-        const latest = await publicClient.getBlockNumber();
-        // publicnode caps eth_getLogs at ~50k blocks — scan most-recent window
-        const fromBlock = latest > 49_999n ? latest - 49_999n : 0n;
-        const event = parseAbiItem(
-          'event ConversationOpened(address indexed sender, address indexed recipient, address indexed token, uint256 amountPaid, uint256 fee)'
-        );
-        const logs = await publicClient.getLogs({
+        const logs = await logsClient.getLogs({
           address: DMPAY_DIRECT_ADDRESS,
-          event,
-          fromBlock,
-          toBlock: latest,
+          event: priceSetEvent,
+          fromBlock: DMPAY_V2_DEPLOY_BLOCK,
+          toBlock: 'latest',
         });
-        const byRecipient = new Map<string, Creator>();
+        // Keep each creator's most recent PriceSet (their current pricing).
+        const byUser = new Map<string, Creator>();
         for (const log of logs) {
-          const recipient = log.args.recipient as `0x${string}` | undefined;
-          if (!recipient) continue;
-          const key = recipient.toLowerCase();
-          const prev = byRecipient.get(key);
+          const user = log.args.user as `0x${string}` | undefined;
+          if (!user || log.blockNumber == null) continue;
+          const key = user.toLowerCase();
+          const prev = byUser.get(key);
           if (!prev || log.blockNumber > prev.lastSeenBlock) {
-            byRecipient.set(key, {
-              address: recipient,
+            byUser.set(key, {
+              address: user,
               lastSeenBlock: log.blockNumber,
-              openCount: (prev?.openCount ?? 0) + 1,
+              usdc: log.args.usdc ?? 0n,
+              eth: log.args.eth ?? 0n,
+              lifetimeUsdc: log.args.lifetimeUsdc ?? 0n,
+              lifetimeEth: log.args.lifetimeEth ?? 0n,
             });
-          } else {
-            prev.openCount += 1;
           }
         }
-        const list = Array.from(byRecipient.values())
+        // Only show creators who currently have a price set (skip anyone
+        // who has since cleared it to 0/0 to leave).
+        const list = Array.from(byUser.values())
+          .filter(c => c.usdc > 0n || c.eth > 0n || c.lifetimeUsdc > 0n || c.lifetimeEth > 0n)
           .sort((a, b) => Number(b.lastSeenBlock - a.lastSeenBlock));
         if (!cancelled) setCreators(list);
       } catch (e: any) {
         console.error('discover scan failed', e);
-        if (!cancelled) setError(e?.message ?? 'Failed to load creators');
+        if (!cancelled) setError(e?.shortMessage ?? e?.message ?? 'Failed to load creators');
       }
     })();
     return () => { cancelled = true; };
-  }, [publicClient]);
+  }, []);
 
   const total = creators?.length ?? 0;
 
@@ -70,8 +95,8 @@ export function Discover() {
             <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">· Discover</div>
             <h1 className="dm-display text-4xl sm:text-[64px] mt-2 text-text-primary">People worth reaching.</h1>
             <p className="text-text-secondary mt-4 max-w-2xl leading-relaxed">
-              Live from the contract — every creator who's received a paid DM recently.
-              {creators && <> <span className="font-mono text-text-muted">{total} active in the last ~7 days.</span></>}
+              Creators on DMpay — everyone who's set a price and is open for paid DMs.
+              {creators && <> <span className="font-mono text-text-muted">{total} live.</span></>}
             </p>
           </div>
           <button
@@ -86,7 +111,7 @@ export function Discover() {
       <section className="max-w-6xl mx-auto px-6 sm:px-10 pb-20">
         {creators === null && !error && (
           <div className="flex items-center gap-2 text-text-secondary text-sm font-mono">
-            <Loader2 className="animate-spin" size={14} /> Scanning recent on-chain activity…
+            <Loader2 className="animate-spin" size={14} /> Loading creators…
           </div>
         )}
         {error && (
@@ -94,7 +119,7 @@ export function Discover() {
         )}
         {creators && creators.length === 0 && (
           <div className="bg-bg-panel border border-border-subtle rounded-3xl p-10 text-center">
-            <div className="text-text-primary font-medium mb-1">No paid conversations in the last ~7 days.</div>
+            <div className="text-text-primary font-medium mb-1">No creators have set a price yet.</div>
             <div className="text-text-secondary text-sm">Be the first — set your price and share your link.</div>
           </div>
         )}
@@ -117,14 +142,6 @@ function CreatorCard({ c }: { c: Creator }) {
   const normalized = ensName ? safeNormalize(ensName) : undefined;
   const { data: avatar } = useEnsAvatar({ name: normalized, query: { enabled: !!normalized } });
   const { data: description } = useEnsText({ name: normalized, key: 'description', query: { enabled: !!normalized } });
-  const { data: price } = useReadContract({
-    address: DMPAY_DIRECT_ADDRESS,
-    abi: dmpayDirectAbi,
-    functionName: 'priceOf',
-    args: [c.address],
-  });
-  const usdc = price?.[0] ?? 0n;
-  const eth = price?.[1] ?? 0n;
   const display = ensName ?? `${c.address.slice(0, 6)}…${c.address.slice(-4)}`;
   const target = ensName ?? c.address;
 
@@ -149,11 +166,11 @@ function CreatorCard({ c }: { c: Creator }) {
         <div>
           <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">Per DM</div>
           <div className="font-mono text-[15px] font-medium text-text-primary mt-1">
-            {usdc > 0n ? `$${formatUnits(usdc, 6)}` : eth > 0n ? `${formatEther(eth)} ETH` : '—'}
+            {c.usdc > 0n ? `$${formatUnits(c.usdc, 6)}` : c.eth > 0n ? `${formatEther(c.eth)} ETH` : '—'}
           </div>
         </div>
         <div className="flex items-center gap-1 text-text-muted">
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em]">{c.openCount}× paid</span>
+          <span className="font-mono text-[10px] uppercase tracking-[0.14em]">Message</span>
           <ArrowRight size={14} />
         </div>
       </div>
