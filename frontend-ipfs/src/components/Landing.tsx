@@ -3,7 +3,7 @@ import { isAddress } from 'viem';
 import { useAccount } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowRight, ShieldCheck, Lock, Coins, Zap } from 'lucide-react';
+import { Search, ArrowRight, ShieldCheck, Lock, Coins, Zap, PhoneOff, MailX, BotOff, Ban } from 'lucide-react';
 import { ProfileCard } from './ProfileCard';
 import { HeroPreview } from './HeroPreview';
 import { Footer } from './Footer';
@@ -40,13 +40,13 @@ export function Landing() {
               Live on Ethereum mainnet
             </div>
 
-            <h1 className="dm-display text-[64px] sm:text-[88px] lg:text-[104px] mt-6 text-text-primary">
+            <h1 className="dm-display text-[clamp(2.75rem,11vw,6.5rem)] mt-6 text-text-primary">
               Your inbox<br />
               <span className="text-text-muted">is worth more</span><br />
               than zero.
             </h1>
 
-            <p className="text-lg sm:text-xl text-text-secondary max-w-[560px] mt-7 leading-relaxed">
+            <p className="text-base sm:text-xl text-text-secondary max-w-[560px] mt-7 leading-relaxed">
               DMpay turns your wallet into a paywall. Set a price in USDC or ETH —
               fans pay to message you or buy a lifetime pass. Payments settle on-chain. No platform cut.
             </p>
@@ -82,6 +82,36 @@ export function Landing() {
               </span>
             </div>
             <HeroPreview ensName={FEATURED_CREATOR} />
+          </div>
+        </div>
+      </section>
+
+      {/* ────────────── PRIVACY BAND (wallet-only, no surveillance) ────────────── */}
+      <section className="border-t border-border-subtle bg-bg-base">
+        <div className="max-w-6xl mx-auto px-6 sm:px-10 py-12 sm:py-14">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
+            <div className="lg:max-w-sm">
+              <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">Just your wallet</div>
+              <h2 className="dm-display text-3xl sm:text-4xl mt-2 text-text-primary leading-[1.05]">
+                No accounts.<br />No surveillance.
+              </h2>
+              <p className="text-text-secondary mt-3 leading-relaxed">
+                Your wallet is your identity. Nothing to sign up for, nothing to harvest, nobody in the middle.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
+              {[
+                { i: <PhoneOff size={18} />, t: 'No phone numbers' },
+                { i: <MailX size={18} />, t: 'No emails' },
+                { i: <BotOff size={18} />, t: 'No bots' },
+                { i: <Ban size={18} />, t: 'No spam' },
+              ].map(x => (
+                <div key={x.t} className="bg-bg-panel border border-border-subtle rounded-2xl p-4 sm:p-5 flex flex-col gap-3">
+                  <div className="w-9 h-9 rounded-lg grid place-items-center bg-chip text-text-primary">{x.i}</div>
+                  <div className="text-[14px] sm:text-[15px] font-medium text-text-primary leading-tight">{x.t}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>

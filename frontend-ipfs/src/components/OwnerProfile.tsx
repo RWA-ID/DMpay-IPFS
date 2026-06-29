@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useEnsName, useEnsAvatar, useEnsText, useReadContract, usePublicClient } from 'wagmi';
+import { useEnsName, useEnsAvatar, useEnsText, useReadContract } from 'wagmi';
 import { normalize } from 'viem/ens';
 import { parseAbiItem, formatUnits, formatEther } from 'viem';
 import { Globe, AtSign, Code2, Settings as SettingsIcon, MessageCircle, Infinity as InfinityIcon, ShieldCheck, ExternalLink, Loader2, BadgePlus, Pencil, X } from 'lucide-react';
@@ -10,6 +10,7 @@ import { ShareProfile } from './ShareProfile';
 import { EnsRegister } from './EnsRegister';
 import { EnsRecordsEditor } from './EnsRecordsEditor';
 import { DMPAY_DIRECT_ADDRESS, USDC_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
+import { logsClient, DMPAY_V2_DEPLOY_BLOCK } from '../lib/logs';
 
 type SupporterRow = {
   sender: `0x${string}`;
@@ -21,7 +22,6 @@ type SupporterRow = {
 
 export function OwnerProfile({ address }: { address: `0x${string}` }) {
   const navigate = useNavigate();
-  const publicClient = usePublicClient();
 
   const { data: ensName, refetch: refetchEnsName } = useEnsName({ address });
   const normalized = ensName ? safeNormalize(ensName) : undefined;
@@ -47,24 +47,22 @@ export function OwnerProfile({ address }: { address: `0x${string}` }) {
   const hasPerDM = usdc > 0n || eth > 0n;
 
   const [supporters, setSupporters] = useState<SupporterRow[] | null>(null);
-  const [scanWindow, setScanWindow] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!publicClient) return;
     let cancelled = false;
     (async () => {
       try {
-        const latest = await publicClient.getBlockNumber();
-        const fromBlock = latest > 49_999n ? latest - 49_999n : 0n;
         const event = parseAbiItem(
           'event ConversationOpened(address indexed sender, address indexed recipient, address indexed token, uint256 amountPaid, uint256 fee)'
         );
-        const logs = await publicClient.getLogs({
+        // All-time scan from the V2 deploy block via the keyless full-range
+        // client (the app's default RPC rejects wide getLogs as "archive").
+        const logs = await logsClient.getLogs({
           address: DMPAY_DIRECT_ADDRESS,
           event,
           args: { recipient: address },
-          fromBlock,
-          toBlock: latest,
+          fromBlock: DMPAY_V2_DEPLOY_BLOCK,
+          toBlock: 'latest',
         });
         const rows: SupporterRow[] = logs.map(l => ({
           sender: l.args.sender as `0x${string}`,
@@ -73,17 +71,14 @@ export function OwnerProfile({ address }: { address: `0x${string}` }) {
           blockNumber: l.blockNumber,
         })).sort((a, b) => Number(b.blockNumber - a.blockNumber));
 
-        if (!cancelled) {
-          setSupporters(rows);
-          setScanWindow(Number(latest - fromBlock));
-        }
+        if (!cancelled) setSupporters(rows);
       } catch (e) {
         console.error('owner supporters scan failed', e);
         if (!cancelled) setSupporters([]);
       }
     })();
     return () => { cancelled = true; };
-  }, [publicClient, address]);
+  }, [address]);
 
   const stats = useMemo(() => {
     if (!supporters) return null;
@@ -188,37 +183,35 @@ export function OwnerProfile({ address }: { address: `0x${string}` }) {
         <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr]">
           {/* ─────────── LEFT — STATS + SUPPORTERS ─────────── */}
           <section className="px-6 sm:px-10 pt-10 pb-10 lg:border-r border-border-subtle">
-            <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted mb-5">Recent activity</div>
+            <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted mb-5">All-time activity</div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-6 gap-x-4 pb-8 border-b border-border-subtle">
               <Stat label="Supporters" value={stats ? String(stats.uniqueSenders) : '—'} loading={!stats} />
               <Stat label="Payments" value={stats ? String(stats.payments) : '—'} loading={!stats} />
               <Stat
-                label="USDC, recent"
+                label="USDC, all-time"
                 value={stats && stats.usdcTotal > 0n ? `$${Number(formatUnits(stats.usdcTotal, 6)).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '$0'}
                 loading={!stats}
               />
               <Stat
-                label="ETH, recent"
+                label="ETH, all-time"
                 value={stats && stats.ethTotal > 0n ? `${trim(formatEther(stats.ethTotal), 4)}` : '0'}
                 loading={!stats}
               />
             </div>
-            {scanWindow !== null && (
-              <div className="font-mono text-[10.5px] text-text-muted mt-3">
-                · Stats computed from the last {scanWindow.toLocaleString()} blocks (~7 days) of <span className="text-text-secondary">ConversationOpened</span> events.{' '}
-                <a
-                  href={`https://etherscan.io/address/${DMPAY_DIRECT_ADDRESS}#events`}
-                  target="_blank" rel="noreferrer"
-                  className="text-text-secondary underline underline-offset-2 hover:text-text-primary"
-                >
-                  Etherscan <ExternalLink size={9} className="inline" />
-                </a>
-              </div>
-            )}
+            <div className="font-mono text-[10.5px] text-text-muted mt-3">
+              · All-time totals from <span className="text-text-secondary">ConversationOpened</span> events since launch.{' '}
+              <a
+                href={`https://etherscan.io/address/${DMPAY_DIRECT_ADDRESS}#events`}
+                target="_blank" rel="noreferrer"
+                className="text-text-secondary underline underline-offset-2 hover:text-text-primary"
+              >
+                Etherscan <ExternalLink size={9} className="inline" />
+              </a>
+            </div>
 
             <div className="mt-10">
               <div className="flex items-center justify-between mb-3">
-                <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">Recent supporters</div>
+                <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">Supporters</div>
                 <a
                   href={`https://etherscan.io/address/${address}#tokentxns`}
                   target="_blank" rel="noreferrer"
@@ -229,12 +222,12 @@ export function OwnerProfile({ address }: { address: `0x${string}` }) {
               </div>
               {supporters === null && (
                 <div className="flex items-center gap-2 text-text-secondary text-sm font-mono">
-                  <Loader2 className="animate-spin" size={14} /> Scanning recent payments…
+                  <Loader2 className="animate-spin" size={14} /> Scanning payment history…
                 </div>
               )}
               {supporters && supporters.length === 0 && (
                 <div className="bg-bg-panel border border-border-subtle rounded-2xl p-5 text-sm text-text-secondary">
-                  No paid DMs yet in the last ~7 days. Share your link and watch this fill in.
+                  No paid DMs yet. Share your link and watch this fill in.
                 </div>
               )}
               {supporters && supporters.length > 0 && (

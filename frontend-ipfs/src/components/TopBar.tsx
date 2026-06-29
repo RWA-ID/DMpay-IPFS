@@ -28,21 +28,22 @@ export function TopBar() {
           <>
             <button
               onClick={() => navigate('/inbox')}
-              className="flex items-center gap-1.5 bg-bg-elevated hover:bg-bg-hover text-text-primary rounded-full px-3 py-1.5 text-sm transition-colors"
+              className="flex items-center gap-1.5 bg-bg-elevated hover:bg-bg-hover text-text-primary rounded-full px-2.5 sm:px-3 py-1.5 text-sm transition-colors"
+              aria-label="Inbox"
             >
-              <InboxIcon size={14} /> Inbox
+              <InboxIcon size={14} /> <span className="hidden sm:inline">Inbox</span>
             </button>
             {client ? (
-              <span className="flex items-center gap-1.5 bg-green-500/10 text-green-400 rounded-full px-3 py-1.5 text-sm">
-                <CheckCircle2 size={14} /> XMTP
+              <span className="flex items-center gap-1.5 bg-green-500/10 text-green-400 rounded-full px-2.5 sm:px-3 py-1.5 text-sm">
+                <CheckCircle2 size={14} /> <span className="hidden sm:inline">XMTP</span>
               </span>
             ) : error ? (
               <div className="relative">
                 <button
                   onClick={() => setShowErr((v) => !v)}
-                  className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-full px-3 py-1.5 text-sm"
+                  className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-full px-2.5 sm:px-3 py-1.5 text-sm"
                 >
-                  <AlertTriangle size={14} /> XMTP error
+                  <AlertTriangle size={14} /> <span className="hidden sm:inline">XMTP error</span>
                 </button>
                 {showErr && (
                   <div className="absolute right-0 mt-2 w-80 bg-bg-panel border border-border-subtle rounded-2xl p-4 shadow-2xl z-50 text-left">
@@ -61,10 +62,11 @@ export function TopBar() {
               <button
                 onClick={() => init()}
                 disabled={initializing}
-                className="flex items-center gap-1.5 bg-brand hover:bg-brand-hover disabled:opacity-50 text-brand-ink rounded-full px-3 py-1.5 text-sm transition-colors"
+                className="flex items-center gap-1.5 bg-brand hover:bg-brand-hover disabled:opacity-50 text-brand-ink rounded-full px-2.5 sm:px-3 py-1.5 text-sm transition-colors"
+                aria-label="Connect XMTP"
               >
                 {initializing ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-                {initializing ? 'Connecting…' : 'Connect XMTP'}
+                <span className="hidden sm:inline">{initializing ? 'Connecting…' : 'Connect XMTP'}</span>
               </button>
             )}
           </>

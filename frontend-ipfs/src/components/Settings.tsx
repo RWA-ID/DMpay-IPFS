@@ -89,9 +89,9 @@ export function Settings() {
 
         <div className="flex items-center gap-4 mb-8">
           <Avatar src={avatar || undefined} fallback={display[0]} size={64} />
-          <div>
-            <h1 className="text-2xl font-semibold text-text-primary">{display}</h1>
-            <div className="text-xs text-text-muted font-mono mt-1">{address}</div>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold text-text-primary truncate">{display}</h1>
+            <div className="text-xs text-text-muted font-mono mt-1 break-all">{address}</div>
           </div>
         </div>
 

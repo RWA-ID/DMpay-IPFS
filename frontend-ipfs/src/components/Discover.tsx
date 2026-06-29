@@ -1,29 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEnsName, useEnsAvatar, useEnsText } from 'wagmi';
-import {
-  createPublicClient, fallback, http, parseAbiItem, formatUnits, formatEther,
-} from 'viem';
-import { mainnet } from 'viem/chains';
+import { parseAbiItem, formatUnits, formatEther } from 'viem';
 import { normalize } from 'viem/ens';
 import { ArrowRight, Loader2, Search } from 'lucide-react';
 import { Footer } from './Footer';
 import { Avatar } from './Avatar';
 import { DMPAY_DIRECT_ADDRESS } from '../lib/contracts';
-
-// V2 deployment block — start of all PriceSet history.
-const DMPAY_V2_DEPLOY_BLOCK = 25169356n;
-
-// Dedicated client for the eth_getLogs scan. The app's default RPC
-// (publicnode) rejects wide log ranges as "archive". These public
-// endpoints serve full-range getLogs without an API key.
-const logsClient = createPublicClient({
-  chain: mainnet,
-  transport: fallback([
-    http('https://gateway.tenderly.co/public/mainnet'),
-    http('https://eth.api.onfinality.io/public'),
-  ]),
-});
+import { logsClient, DMPAY_V2_DEPLOY_BLOCK } from '../lib/logs';
 
 const priceSetEvent = parseAbiItem(
   'event PriceSet(address indexed user, uint256 usdc, uint256 eth, uint256 lifetimeUsdc, uint256 lifetimeEth)'
