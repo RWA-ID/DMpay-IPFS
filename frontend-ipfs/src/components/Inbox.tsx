@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEnsName, useEnsAvatar } from 'wagmi';
 import { normalize } from 'viem/ens';
 import { isAddress } from 'viem';
-import { Loader2, MessageSquare, Inbox as InboxIcon, Zap, RefreshCw, Search } from 'lucide-react';
+import { Loader2, MessageSquare, Inbox as InboxIcon, Zap, RefreshCw, Search, Users } from 'lucide-react';
 import type { Dm, DecodedMessage } from '@xmtp/browser-sdk';
 import { ConsentState } from '@xmtp/browser-sdk';
 import { useXmtpClient } from '../hooks/useXmtpClient';
@@ -97,6 +97,13 @@ export function Inbox() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/groups/new')}
+              className="font-mono text-xs text-text-muted hover:text-text-primary inline-flex items-center gap-1.5 border border-border-subtle rounded-full px-3 py-2"
+              title="Create a paid group chat"
+            >
+              <Users size={12} /> New group
+            </button>
             <button
               onClick={() => setReloadKey(k => k + 1)}
               className="font-mono text-xs text-text-muted hover:text-text-primary inline-flex items-center gap-1.5 border border-border-subtle rounded-full px-3 py-2"

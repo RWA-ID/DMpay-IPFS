@@ -1,4 +1,4 @@
-import { MessageSquare, Plus, Compass, Settings, HelpCircle, User } from 'lucide-react';
+import { MessageSquare, Plus, Compass, Settings, HelpCircle, User, Users } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAccount, useEnsName } from 'wagmi';
 
@@ -11,6 +11,7 @@ export function Sidebar() {
   const isInbox = pathname === '/inbox' || pathname.startsWith('/c/');
   const isDiscover = pathname === '/discover';
   const isSettings = pathname === '/settings';
+  const isNewGroup = pathname === '/groups/new';
   const isProfile = pathname.startsWith('/u/');
 
   const profileTarget = ensName ?? address;
@@ -21,6 +22,7 @@ export function Sidebar() {
         <SidebarBtn icon={MessageSquare} active={isInbox} onClick={() => navigate('/inbox')} label="Inbox" />
         <SidebarBtn icon={Plus} onClick={() => navigate('/')} label="New chat" />
         <SidebarBtn icon={Compass} active={isDiscover} onClick={() => navigate('/discover')} label="Discover" />
+        <SidebarBtn icon={Users} active={isNewGroup} onClick={() => navigate('/groups/new')} label="New group" />
         {profileTarget && (
           <SidebarBtn icon={User} active={isProfile} onClick={() => navigate(`/u/${profileTarget}`)} label="My profile" />
         )}

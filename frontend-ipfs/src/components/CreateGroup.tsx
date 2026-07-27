@@ -6,6 +6,7 @@ import { parseUnits, parseEther, decodeEventLog } from 'viem';
 import { ArrowLeft, Users, Loader2, CheckCircle2, AlertCircle, Sparkles, Copy } from 'lucide-react';
 import { DMPAY_DIRECT_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 import { useXmtpClient } from '../hooks/useXmtpClient';
+import { siteUrl } from '../lib/site';
 
 export function CreateGroup() {
   const navigate = useNavigate();
@@ -101,7 +102,7 @@ export function CreateGroup() {
   const xmtpDone = !!xmtpGroupId;
   const linkDone = linkReceipt.isSuccess;
   const allDone = onChainDone && xmtpDone && linkDone;
-  const shareUrl = groupId !== null ? `${window.location.origin}/#/g/${groupId.toString()}` : '';
+  const shareUrl = groupId !== null ? siteUrl(`/g/${groupId.toString()}`) : '';
 
   if (!isConnected) {
     return (

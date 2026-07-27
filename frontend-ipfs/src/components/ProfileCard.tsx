@@ -84,7 +84,7 @@ export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
             <div className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-text-muted">
               · Direct messaging
             </div>
-            <h1 className="dm-display mt-1.5 text-4xl sm:text-5xl text-text-primary truncate">
+            <h1 className="dm-display mt-1.5 text-[clamp(1.75rem,3.4vw,3rem)] leading-[1.05] text-text-primary break-words">
               {display}
             </h1>
             <div className="font-mono text-xs text-text-muted mt-2 truncate">{shortAddr}</div>

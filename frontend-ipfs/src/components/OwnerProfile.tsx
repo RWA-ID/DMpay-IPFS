@@ -109,7 +109,9 @@ export function OwnerProfile({ address }: { address: `0x${string}` }) {
             <div className="flex items-start gap-6 min-w-0">
               <Avatar src={avatar || undefined} fallback={display[0]} size={108} />
               <div className="min-w-0 pt-1">
-                <h1 className="dm-display text-5xl sm:text-[72px] text-text-primary truncate">{display}</h1>
+                {/* Fluid, wrapping — `truncate` at a fixed 72px clipped any long ENS name
+                    (e.g. vault.ensgiant.eth) once the action buttons claimed the right column. */}
+                <h1 className="dm-display text-[clamp(2rem,4.2vw,3.5rem)] leading-[1.05] text-text-primary break-words">{display}</h1>
                 <div className="font-mono text-xs text-text-muted mt-2">
                   {address.slice(0, 6)}…{address.slice(-4)}
                 </div>
@@ -137,7 +139,7 @@ export function OwnerProfile({ address }: { address: `0x${string}` }) {
                 )}
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 self-start md:self-end">
+            <div className="flex flex-wrap md:flex-nowrap shrink-0 gap-2 self-start md:self-end">
               {!ensName ? (
                 <button
                   onClick={() => setPanel('register')}
