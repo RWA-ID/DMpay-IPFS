@@ -35,7 +35,7 @@ export function decodeGroupMeta(raw: string | null | undefined): PublicGroupMeta
   try { parsed = JSON.parse(raw); } catch { return null; }
   if (!parsed || typeof parsed !== 'object') return null;
   const obj = parsed as Record<string, unknown>;
-  const name = typeof obj.name === 'string' && obj.name.trim() ? obj.name.trim().slice(0, 120) : null;
+  const name = typeof obj.name === 'string' && cleanName(obj.name) ? cleanName(obj.name) : null;
   const image = typeof obj.image === 'string' && /^https?:\/\//i.test(obj.image.trim())
     ? obj.image.trim().slice(0, 500)
     : null;
@@ -88,6 +88,21 @@ export async function fetchPublicGroupMeta(
     }
   }));
   return out;
+}
+
+/**
+ * Strip markup characters and control characters from a published name. React
+ * escapes on render, so this is not what keeps the app safe — it exists so the
+ * value stays sane wherever else it travels, including the Pages function that
+ * writes it into an HTML attribute for link previews.
+ */
+function cleanName(raw: string): string {
+  return raw
+    .replace(/[<>]/g, '')
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120);
 }
 
 function safeNormalize(name: string): string | undefined {
