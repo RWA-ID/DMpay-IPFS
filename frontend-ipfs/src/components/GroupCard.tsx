@@ -5,23 +5,31 @@ import { ArrowRight, Loader2, Users } from 'lucide-react';
 import { GroupAvatar } from './GroupAvatar';
 import { hasXmtpId, xmtpIdKey, type PublicGroup } from '../lib/groups';
 import { groupPath } from '../lib/site';
-import type { GroupMetaMap } from '../hooks/useGroups';
+import type { GroupMetaMap, PublicMetaMap } from '../hooks/useGroups';
 
 /**
  * One paid group, as seen from outside. Name and image come from XMTP group
  * metadata, which is member-only — non-members see the id plus the gradient
  * derived from it, which is still a stable visual identity.
  */
-export function GroupCard({ group, meta, showCreator = true }: {
+export function GroupCard({ group, meta, publicMeta, showCreator = true }: {
   group: PublicGroup;
   meta?: GroupMetaMap;
+  publicMeta?: PublicMetaMap;
   showCreator?: boolean;
 }) {
   const navigate = useNavigate();
   const { data: ensName } = useEnsName({ address: group.creator, query: { enabled: showCreator } });
 
-  const known = meta?.get(xmtpIdKey(group.xmtpGroupId));
-  const name = known?.name || `Group #${group.id.toString()}`;
+  // Membership beats publication: the XMTP metadata is what the group actually
+  // is, the ENS record is the creator's public copy of it, which can lag.
+  const fromXmtp = meta?.get(xmtpIdKey(group.xmtpGroupId));
+  const published = publicMeta?.get(group.id.toString());
+  const known = {
+    name: fromXmtp?.name || published?.name || null,
+    imageUrl: fromXmtp?.imageUrl || published?.image || null,
+  };
+  const name = known.name || `Group #${group.id.toString()}`;
   const creatorLabel = ensName ?? `${group.creator.slice(0, 6)}…${group.creator.slice(-4)}`;
   const full = group.capacity > 0n && group.memberCount >= group.capacity;
   const linked = hasXmtpId(group.xmtpGroupId);
@@ -32,11 +40,11 @@ export function GroupCard({ group, meta, showCreator = true }: {
 
   return (
     <button
-      onClick={() => navigate(groupPath(group.id, known?.name))}
+      onClick={() => navigate(groupPath(group.id, known.name))}
       className="bg-bg-panel border border-border-subtle rounded-2xl p-5 text-left hover:bg-bg-elevated transition-colors flex flex-col gap-4 min-h-[200px]"
     >
       <div className="flex items-start gap-3">
-        <GroupAvatar src={known?.imageUrl} seed={group.id.toString()} name={known?.name} size={44} />
+        <GroupAvatar src={known.imageUrl} seed={group.id.toString()} name={known.name} size={44} />
         <div className="flex-1 min-w-0">
           <div className="text-[14px] font-medium text-text-primary truncate">{name}</div>
           {showCreator ? (
@@ -84,9 +92,10 @@ export function GroupCard({ group, meta, showCreator = true }: {
 }
 
 /** Grid of group cards with the loading / error / empty states shared by both listings. */
-export function GroupGrid({ groups, meta, error, empty, showCreator = true, loadingLabel = 'Loading groups…' }: {
+export function GroupGrid({ groups, meta, publicMeta, error, empty, showCreator = true, loadingLabel = 'Loading groups…' }: {
   groups: PublicGroup[] | null;
   meta?: GroupMetaMap;
+  publicMeta?: PublicMetaMap;
   error?: string | null;
   empty: React.ReactNode;
   showCreator?: boolean;
@@ -106,7 +115,7 @@ export function GroupGrid({ groups, meta, error, empty, showCreator = true, load
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {groups.map(g => (
-        <GroupCard key={g.id.toString()} group={g} meta={meta} showCreator={showCreator} />
+        <GroupCard key={g.id.toString()} group={g} meta={meta} publicMeta={publicMeta} showCreator={showCreator} />
       ))}
     </div>
   );

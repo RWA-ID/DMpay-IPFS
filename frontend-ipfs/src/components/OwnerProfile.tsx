@@ -10,7 +10,7 @@ import { ShareProfile } from './ShareProfile';
 import { EnsRegister } from './EnsRegister';
 import { EnsRecordsEditor } from './EnsRecordsEditor';
 import { GroupGrid } from './GroupCard';
-import { usePublicGroups, useLocalGroupMeta } from '../hooks/useGroups';
+import { usePublicGroups, useLocalGroupMeta, usePublicGroupMeta } from '../hooks/useGroups';
 import { DMPAY_DIRECT_ADDRESS, USDC_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 import { logsClient, DMPAY_V2_DEPLOY_BLOCK } from '../lib/logs';
 
@@ -54,6 +54,7 @@ export function OwnerProfile({ address }: { address: `0x${string}` }) {
   // person who can act on a broken one.
   const { groups, error: groupsError } = usePublicGroups(address, !!address);
   const groupMeta = useLocalGroupMeta();
+  const publishedMeta = usePublicGroupMeta(groups);
 
   useEffect(() => {
     let cancelled = false;
@@ -320,6 +321,7 @@ export function OwnerProfile({ address }: { address: `0x${string}` }) {
           <GroupGrid
             groups={groups}
             meta={groupMeta}
+            publicMeta={publishedMeta}
             error={groupsError}
             showCreator={false}
             loadingLabel="Scanning your groups…"

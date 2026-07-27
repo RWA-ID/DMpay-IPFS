@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Group } from '@xmtp/browser-sdk';
 import { fetchPublicGroups, xmtpIdKey, type PublicGroup } from '../lib/groups';
+import { fetchPublicGroupMeta, type PublicGroupMeta } from '../lib/groupMeta';
 import { useXmtpClient } from './useXmtpClient';
 
 export type GroupMetaMap = Map<string, { name: string | null; imageUrl: string | null }>;
@@ -34,6 +35,52 @@ export function usePublicGroups(creator?: `0x${string}`, enabled = true) {
   }, [creator, enabled]);
 
   return { groups, error };
+}
+
+export type PublicMetaMap = Map<string, PublicGroupMeta>;
+
+/**
+ * Metadata the creators published to their ENS names, keyed by group id. This
+ * is the only group identity a non-member can see, so every public listing
+ * falls back to it. Groups are bucketed by creator so each ENS name is
+ * verified once, not once per group.
+ */
+export function usePublicGroupMeta(
+  groups: { id: bigint; creator: `0x${string}` }[] | null,
+): PublicMetaMap {
+  const [meta, setMeta] = useState<PublicMetaMap>(new Map());
+
+  // Stable identity for the effect: creator -> ids, as a plain string.
+  const buckets = useMemo(() => {
+    const byCreator = new Map<`0x${string}`, string[]>();
+    for (const g of groups ?? []) {
+      const list = byCreator.get(g.creator) ?? [];
+      list.push(g.id.toString());
+      byCreator.set(g.creator, list);
+    }
+    return byCreator;
+  }, [groups]);
+  const key = useMemo(
+    () => [...buckets.entries()].map(([c, ids]) => `${c}:${ids.join(',')}`).sort().join('|'),
+    [buckets],
+  );
+
+  useEffect(() => {
+    if (buckets.size === 0) { setMeta(new Map()); return; }
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.all(
+        [...buckets.entries()].map(([creator, ids]) => fetchPublicGroupMeta(creator, ids)),
+      );
+      if (cancelled) return;
+      const merged: PublicMetaMap = new Map();
+      for (const r of results) for (const [id, m] of r) merged.set(id, m);
+      setMeta(merged);
+    })();
+    return () => { cancelled = true; };
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return meta;
 }
 
 /**

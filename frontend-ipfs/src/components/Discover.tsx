@@ -7,7 +7,7 @@ import { ArrowRight, Loader2, Search, Users } from 'lucide-react';
 import { Footer } from './Footer';
 import { Avatar } from './Avatar';
 import { GroupGrid } from './GroupCard';
-import { usePublicGroups, useLocalGroupMeta } from '../hooks/useGroups';
+import { usePublicGroups, useLocalGroupMeta, usePublicGroupMeta } from '../hooks/useGroups';
 import { hasXmtpId } from '../lib/groups';
 import { DMPAY_DIRECT_ADDRESS } from '../lib/contracts';
 import { logsClient, DMPAY_V2_DEPLOY_BLOCK } from '../lib/logs';
@@ -77,6 +77,7 @@ export function Discover() {
   const { groups: allGroups, error: groupsError } = usePublicGroups();
   const groupMeta = useLocalGroupMeta();
   const groups = allGroups?.filter(g => g.active && hasXmtpId(g.xmtpGroupId)) ?? null;
+  const publishedMeta = usePublicGroupMeta(groups);
 
   const total = creators?.length ?? 0;
 
@@ -146,6 +147,7 @@ export function Discover() {
           <GroupGrid
             groups={groups}
             meta={groupMeta}
+            publicMeta={publishedMeta}
             error={groupsError}
             empty={null}
             loadingLabel="Loading groups…"

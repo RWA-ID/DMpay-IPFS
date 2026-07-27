@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAccount, useReadContract, useEnsName } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
@@ -14,10 +14,12 @@ import { XmtpChat } from './XmtpChat';
 import { GroupPaywall } from './GroupPaywall';
 import { formatEther, formatUnits } from 'viem';
 import { ShareGroup } from './ShareGroup';
+import type { PublicGroupMeta } from '../lib/groupMeta';
 import { GroupAvatar } from './GroupAvatar';
 import { GroupSettings } from './GroupSettings';
 import { GroupMembers } from './GroupMembers';
 import { useGroupMembers } from '../hooks/useGroupMembers';
+import { usePublicGroupMeta } from '../hooks/useGroups';
 
 export type GroupMeta = { name: string | null; imageUrl: string | null };
 
@@ -57,6 +59,16 @@ export function GroupView() {
 
   const { members, byInboxId, error: membersError, reload: reloadMembers } = useGroupMembers(convo);
 
+  // The creator's public copy of the group's identity. It's all a non-member
+  // has, and it's what a shared link renders before anyone connects.
+  const creator = group?.creator;
+  const forMeta = useMemo(
+    () => (creator && id !== null ? [{ id, creator }] : null),
+    [creator, id],
+  );
+  const publishedAll = usePublicGroupMeta(forMeta);
+  const published = id !== null ? publishedAll.get(id.toString()) ?? null : null;
+
   const onReconciled = useCallback((result: { unreachable: number }) => {
     setUnreachable(result.unreachable);
     reloadMembers();
@@ -83,14 +95,14 @@ export function GroupView() {
   // they've been invited to rather than a bare connect button that duplicates
   // the one already in the top bar.
   if (!isConnected) {
-    return <GroupPreview id={id} group={group} onConnect={() => openConnectModal?.()} />;
+    return <GroupPreview id={id} group={group} published={published} onConnect={() => openConnectModal?.()} />;
   }
 
   if (!group.active) {
     return <Notice title="Group closed" body="The creator has closed this group. Existing messages stay in your XMTP inbox." onBack={() => navigate('/inbox')} />;
   }
 
-  const groupName = meta.name || `Group #${id.toString()}`;
+  const groupName = meta.name || published?.name || `Group #${id.toString()}`;
 
   return (
     <main className="flex-1 flex flex-col bg-bg-base min-h-0">
@@ -98,7 +110,7 @@ export function GroupView() {
         id={id}
         group={group}
         name={groupName}
-        imageUrl={meta.imageUrl}
+        imageUrl={meta.imageUrl || published?.image || null}
         meta={meta}
         isCreator={isCreator}
         canEdit={isCreator && !!convo}
@@ -120,6 +132,7 @@ export function GroupView() {
       )}
       {settingsOpen && convo && (
         <GroupSettings
+          id={id}
           convo={convo}
           initial={meta}
           onClose={() => setSettingsOpen(false)}
@@ -424,9 +437,10 @@ function Centered({ children }: { children: React.ReactNode }) {
  * being offered, from chain state alone. The name and image can't appear here —
  * they live in the encrypted XMTP group and only members can read them.
  */
-function GroupPreview({ id, group, onConnect }: {
+function GroupPreview({ id, group, published, onConnect }: {
   id: bigint;
   group: OnchainGroup;
+  published: PublicGroupMeta | null;
   onConnect: () => void;
 }) {
   const { data: creatorEns } = useEnsName({ address: group.creator });
@@ -443,9 +457,11 @@ function GroupPreview({ id, group, onConnect }: {
 
         <div className="bg-bg-panel border border-border-subtle rounded-3xl p-7">
           <div className="flex items-start gap-4">
-            <GroupAvatar src={null} seed={id.toString()} name={null} size={56} />
+            <GroupAvatar src={published?.image} seed={id.toString()} name={published?.name} size={56} />
             <div className="min-w-0 flex-1">
-              <h1 className="dm-display text-3xl text-text-primary leading-tight">Group #{id.toString()}</h1>
+              <h1 className="dm-display text-3xl text-text-primary leading-tight break-words">
+                {published?.name || `Group #${id.toString()}`}
+              </h1>
               <div className="font-mono text-[12px] text-text-muted mt-1.5 truncate">by {creatorLabel}</div>
             </div>
           </div>
@@ -476,13 +492,15 @@ function GroupPreview({ id, group, onConnect }: {
 
           <div className="text-[11px] text-text-muted mt-4 leading-relaxed">
             Pay once for a seat — 97.5% settles directly to the creator, 2.5% protocol fee, no custody.
-            The conversation is an end-to-end encrypted XMTP group, so its name and image are only
-            readable once you're a member.
+            The conversation is an end-to-end encrypted XMTP group.{' '}
+            {published
+              ? 'Its name and image here are the creator\u2019s public copy, published on their ENS name.'
+              : 'Its name and image are readable only once you\u2019re a member.'}
           </div>
         </div>
 
         <div className="mt-6">
-          <ShareGroup id={id} price={price} />
+          <ShareGroup id={id} name={published?.name} price={price} />
         </div>
       </div>
     </main>

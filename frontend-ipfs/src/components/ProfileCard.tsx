@@ -7,7 +7,7 @@ import { Avatar } from './Avatar';
 import { EfpChip } from './EfpStats';
 import { ShareProfile } from './ShareProfile';
 import { GroupGrid } from './GroupCard';
-import { usePublicGroups, useLocalGroupMeta } from '../hooks/useGroups';
+import { usePublicGroups, useLocalGroupMeta, usePublicGroupMeta } from '../hooks/useGroups';
 import { hasXmtpId, xmtpIdKey } from '../lib/groups';
 import { DMPAY_DIRECT_ADDRESS, DMPAY_DIRECT_V1_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 
@@ -66,6 +66,7 @@ export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
   const { groups: allGroups, error: groupsError } = usePublicGroups(address, !!address);
   const groupMeta = useLocalGroupMeta();
   const groups = allGroups?.filter(g => g.active && hasXmtpId(g.xmtpGroupId)) ?? null;
+  const publishedMeta = usePublicGroupMeta(groups);
 
   function handleDM(tier?: 'usdc' | 'eth' | 'lifetimeUsdc' | 'lifetimeEth') {
     if (!address) return;
@@ -215,12 +216,13 @@ export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
           <GroupGrid
             groups={groups}
             meta={groupMeta}
+            publicMeta={publishedMeta}
             error={groupsError}
             showCreator={false}
             empty={null}
             loadingLabel="Loading groups…"
           />
-          {groups?.some(g => !groupMeta.get(xmtpIdKey(g.xmtpGroupId))?.name) && (
+          {groups?.some(g => !groupMeta.get(xmtpIdKey(g.xmtpGroupId))?.name && !publishedMeta.get(g.id.toString())?.name) && (
             <div className="text-[11px] text-text-muted mt-3 leading-snug">
               Group names and images live in the encrypted XMTP group — they appear once you're a member.
             </div>
