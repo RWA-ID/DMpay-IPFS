@@ -6,13 +6,12 @@ import { ArrowLeft, Users, Loader2, AlertCircle, Clock, Pencil, ChevronDown } fr
 import type { Group } from '@xmtp/browser-sdk';
 import { DMPAY_DIRECT_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 import {
-  parseGroupTuple, bytes32ToXmtpId, xmtpIdKey, hasXmtpId, fetchGroupJoiners, type OnchainGroup,
+  parseGroupTuple, bytes32ToXmtpId, xmtpIdKey, hasXmtpId, fetchGroupJoiners, seatPriceLabel, type OnchainGroup,
 } from '../lib/groups';
 import { ethIdentifier } from '../lib/xmtp';
 import { useXmtpClient } from '../hooks/useXmtpClient';
 import { XmtpChat } from './XmtpChat';
 import { GroupPaywall } from './GroupPaywall';
-import { formatEther, formatUnits } from 'viem';
 import { ShareGroup } from './ShareGroup';
 import type { PublicGroupMeta } from '../lib/groupMeta';
 import { GroupAvatar } from './GroupAvatar';
@@ -410,7 +409,7 @@ function GroupHeader({ id, group, name, meta, imageUrl, isCreator, canEdit, onEd
           <Pencil size={11} /> Edit
         </button>
       )}
-      <ShareGroup id={id} name={meta.name} price={priceLabel(group)} variant="pill" />
+      <ShareGroup id={id} name={meta.name} price={seatPriceLabel(group)} variant="pill" />
     </header>
   );
 }
@@ -446,7 +445,7 @@ function GroupPreview({ id, group, published, onConnect }: {
   const { data: creatorEns } = useEnsName({ address: group.creator });
   const creatorLabel = creatorEns ?? `${group.creator.slice(0, 6)}…${group.creator.slice(-4)}`;
   const full = group.capacity > 0n && group.memberCount >= group.capacity;
-  const price = priceLabel(group);
+  const price = seatPriceLabel(group);
 
   return (
     <main className="flex-1 overflow-y-auto bg-bg-base">
@@ -505,13 +504,6 @@ function GroupPreview({ id, group, published, onConnect }: {
       </div>
     </main>
   );
-}
-
-/** Seat price in the currency the creator actually priced in, for share copy. */
-function priceLabel(group: OnchainGroup): string | null {
-  if (group.priceUsdc > 0n) return `$${formatUnits(group.priceUsdc, 6)}`;
-  if (group.priceEth > 0n) return `${formatEther(group.priceEth)} ETH`;
-  return null;
 }
 
 /**

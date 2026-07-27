@@ -1,4 +1,4 @@
-import { getAbiItem } from 'viem';
+import { getAbiItem, formatEther, formatUnits } from 'viem';
 import { DMPAY_DIRECT_ADDRESS, dmpayDirectAbi } from './contracts';
 import { logsClient, DMPAY_V2_DEPLOY_BLOCK } from './logs';
 
@@ -16,6 +16,25 @@ export type OnchainGroup = {
   active: boolean;
   xmtpGroupId: `0x${string}`;
 };
+
+/**
+ * Seat price in whichever currency the creator actually priced in. USDC is
+ * money, so it always carries cents — `formatUnits` alone renders 0.50 as
+ * "0.5", which reads like a bug on a price tag.
+ */
+export function seatPriceLabel(group: { priceUsdc: bigint; priceEth: bigint }): string | null {
+  if (group.priceUsdc > 0n) {
+    return `$${Number(formatUnits(group.priceUsdc, 6)).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  }
+  if (group.priceEth > 0n) {
+    const [whole, frac] = formatEther(group.priceEth).split('.');
+    return `${frac ? `${whole}.${frac.slice(0, 5).replace(/0+$/, '') || '0'}` : whole} ETH`;
+  }
+  return null;
+}
 
 export const ZERO_BYTES32 = '0x0000000000000000000000000000000000000000000000000000000000000000';
 

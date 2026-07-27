@@ -1,9 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { useEnsName } from 'wagmi';
-import { formatEther, formatUnits } from 'viem';
 import { ArrowRight, Loader2, Users } from 'lucide-react';
 import { GroupAvatar } from './GroupAvatar';
-import { hasXmtpId, xmtpIdKey, type PublicGroup } from '../lib/groups';
+import { hasXmtpId, xmtpIdKey, seatPriceLabel, type PublicGroup } from '../lib/groups';
 import { groupPath } from '../lib/site';
 import type { GroupMetaMap, PublicMetaMap } from '../hooks/useGroups';
 
@@ -33,10 +32,7 @@ export function GroupCard({ group, meta, publicMeta, showCreator = true }: {
   const creatorLabel = ensName ?? `${group.creator.slice(0, 6)}…${group.creator.slice(-4)}`;
   const full = group.capacity > 0n && group.memberCount >= group.capacity;
   const linked = hasXmtpId(group.xmtpGroupId);
-  const price =
-    group.priceUsdc > 0n ? `$${formatUnits(group.priceUsdc, 6)}`
-    : group.priceEth > 0n ? `${trim(formatEther(group.priceEth), 5)} ETH`
-    : 'Free';
+  const price = seatPriceLabel(group) ?? 'Free';
 
   return (
     <button
@@ -119,10 +115,4 @@ export function GroupGrid({ groups, meta, publicMeta, error, empty, showCreator 
       ))}
     </div>
   );
-}
-
-function trim(n: string, decimals: number) {
-  const [a, b] = n.split('.');
-  if (!b) return a;
-  return `${a}.${b.slice(0, decimals).replace(/0+$/, '') || '0'}`;
 }

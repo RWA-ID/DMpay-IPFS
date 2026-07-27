@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { formatEther, formatUnits } from 'viem';
 import { Users, Loader2, AlertCircle, Sparkles } from 'lucide-react';
 import { DMPAY_DIRECT_ADDRESS, USDC_ADDRESS, dmpayDirectAbi, erc20Abi } from '../lib/contracts';
-import type { OnchainGroup } from '../lib/groups';
+import { seatPriceLabel, type OnchainGroup } from '../lib/groups';
 import { ShareGroup } from './ShareGroup';
 
 type Tier = 'usdc' | 'eth';
@@ -75,9 +74,7 @@ export function GroupPaywall({
         <div className="mb-6">
           <ShareGroup
             id={id}
-            price={group.priceUsdc > 0n
-              ? `$${formatUnits(group.priceUsdc, 6)}`
-              : group.priceEth > 0n ? `${formatEther(group.priceEth)} ETH` : null}
+            price={seatPriceLabel(group)}
           />
         </div>
 
@@ -91,7 +88,7 @@ export function GroupPaywall({
                   selected={selected === 'usdc'}
                   onSelect={() => setSelected('usdc')}
                   title="Join with USDC"
-                  priceMain={`$${formatUnits(group.priceUsdc, 6)}`}
+                  priceMain={seatPriceLabel({ priceUsdc: group.priceUsdc, priceEth: 0n })!}
                   priceAlt="USDC"
                 />
               )}
@@ -100,7 +97,7 @@ export function GroupPaywall({
                   selected={selected === 'eth'}
                   onSelect={() => setSelected('eth')}
                   title="Join with ETH"
-                  priceMain={`${formatEther(group.priceEth)} ETH`}
+                  priceMain={seatPriceLabel({ priceUsdc: 0n, priceEth: group.priceEth })!}
                   priceAlt="ETH"
                 />
               )}

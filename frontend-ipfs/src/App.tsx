@@ -50,7 +50,20 @@ function Shell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { address, isConnected } = useAccount();
-  const inChat = location.pathname.startsWith('/c/') || location.pathname.startsWith('/g/');
+
+  // The sidebar and chat list are inbox furniture — they only mean anything to
+  // someone signed in, and each carries its own connect prompt. A shared /g/ or
+  // /c/ link usually lands on a signed-out visitor, so they'd arrive to a wall
+  // of duplicate "Connect wallet" buttons around a page they can't use. Give
+  // them the destination full-width instead.
+  //
+  // Keyed on `isConnected` rather than excluding wagmi's 'disconnected' status:
+  // wagmi starts out 'reconnecting' for a second or two even with nothing to
+  // reconnect to, which made the chrome appear and then vanish. Waiting for a
+  // confirmed connection means it only ever slides in, which reads as loading
+  // rather than as content being yanked away.
+  const onChatRoute = location.pathname.startsWith('/c/') || location.pathname.startsWith('/g/');
+  const inChat = onChatRoute && isConnected;
 
   // Profile-first onboarding: when a user connects from the landing page,
   // take them to their own profile (where pricing + ENS setup live).
@@ -84,6 +97,10 @@ function Shell() {
             <Route path="/inbox" element={<Inbox />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/groups/new" element={<CreateGroup />} />
+            {/* Also routed here for the signed-out case above — without these a
+                shared link would match nothing and render a blank page. */}
+            <Route path="/c/:address" element={<ChatView />} />
+            <Route path="/g/:id" element={<GroupView />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
           </Routes>
