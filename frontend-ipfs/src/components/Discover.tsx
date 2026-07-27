@@ -3,9 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useEnsName, useEnsAvatar, useEnsText } from 'wagmi';
 import { parseAbiItem, formatUnits, formatEther } from 'viem';
 import { normalize } from 'viem/ens';
-import { ArrowRight, Loader2, Search } from 'lucide-react';
+import { ArrowRight, Loader2, Search, Users } from 'lucide-react';
 import { Footer } from './Footer';
 import { Avatar } from './Avatar';
+import { GroupGrid } from './GroupCard';
+import { usePublicGroups, useLocalGroupMeta } from '../hooks/useGroups';
+import { hasXmtpId } from '../lib/groups';
 import { DMPAY_DIRECT_ADDRESS } from '../lib/contracts';
 import { logsClient, DMPAY_V2_DEPLOY_BLOCK } from '../lib/logs';
 
@@ -69,6 +72,12 @@ export function Discover() {
     return () => { cancelled = true; };
   }, []);
 
+  // Paid groups, globally. Closed and never-linked groups are dead ends, so
+  // they don't belong in a browse feed.
+  const { groups: allGroups, error: groupsError } = usePublicGroups();
+  const groupMeta = useLocalGroupMeta();
+  const groups = allGroups?.filter(g => g.active && hasXmtpId(g.xmtpGroupId)) ?? null;
+
   const total = creators?.length ?? 0;
 
   return (
@@ -114,6 +123,35 @@ export function Discover() {
           </div>
         )}
       </section>
+
+      {(groups === null || groups.length > 0 || groupsError) && (
+        <section className="max-w-6xl mx-auto px-6 sm:px-10 pb-20 pt-10 border-t border-border-subtle">
+          <div className="flex items-end justify-between flex-wrap gap-4 mb-6">
+            <div>
+              <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">· Paid groups</div>
+              <h2 className="dm-display text-3xl sm:text-[44px] mt-2 text-text-primary">Rooms worth paying for.</h2>
+              <p className="text-text-secondary mt-3 max-w-2xl leading-relaxed">
+                One-time payment per seat, settled on-chain. The conversation itself is an
+                end-to-end encrypted XMTP group.
+                {groups && groups.length > 0 && <> <span className="font-mono text-text-muted">{groups.length} open.</span></>}
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/groups/new')}
+              className="bg-bg-panel hover:bg-bg-hover border border-border-strong text-text-primary rounded-2xl px-5 py-3 font-medium inline-flex items-center gap-2"
+            >
+              <Users size={14} /> Create a group
+            </button>
+          </div>
+          <GroupGrid
+            groups={groups}
+            meta={groupMeta}
+            error={groupsError}
+            empty={null}
+            loadingLabel="Loading groups…"
+          />
+        </section>
+      )}
 
       <Footer />
     </main>

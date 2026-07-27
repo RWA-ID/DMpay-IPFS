@@ -2,6 +2,7 @@ import { getAbiItem } from 'viem';
 import { DMPAY_DIRECT_ADDRESS, dmpayDirectAbi } from './contracts';
 import { logsClient, DMPAY_V2_DEPLOY_BLOCK } from './logs';
 
+const groupCreatedEvent = getAbiItem({ abi: dmpayDirectAbi, name: 'GroupCreated' });
 const groupXmtpIdSetEvent = getAbiItem({ abi: dmpayDirectAbi, name: 'GroupXmtpIdSet' });
 const groupJoinedEvent = getAbiItem({ abi: dmpayDirectAbi, name: 'GroupJoined' });
 
@@ -93,6 +94,58 @@ export async function fetchXmtpIdToGroupId(): Promise<Map<string, bigint>> {
     console.warn('GroupXmtpIdSet scan failed', e);
   }
   return map;
+}
+
+/** A group as a third party can see it: on-chain state plus its id. */
+export type PublicGroup = OnchainGroup & { id: bigint; createdBlock: bigint };
+
+/**
+ * Every group ever created, newest first — optionally narrowed to one creator
+ * (`creator` is an indexed topic, so that filter costs the node nothing).
+ *
+ * The GroupCreated log only carries the terms at creation time; price,
+ * memberCount and `active` all change afterwards, so each id is re-read from
+ * the `groups` getter in one multicall.
+ */
+export async function fetchPublicGroups(opts?: { creator?: `0x${string}` }): Promise<PublicGroup[]> {
+  const logs = await logsClient.getLogs({
+    address: DMPAY_DIRECT_ADDRESS,
+    event: groupCreatedEvent,
+    args: opts?.creator ? { creator: opts.creator } : undefined,
+    fromBlock: DMPAY_V2_DEPLOY_BLOCK,
+    toBlock: 'latest',
+  });
+
+  const ids: bigint[] = [];
+  const createdBlock = new Map<string, bigint>();
+  for (const log of logs) {
+    const id = log.args?.id;
+    if (id === undefined) continue;
+    const key = id.toString();
+    if (createdBlock.has(key)) continue;
+    createdBlock.set(key, log.blockNumber ?? 0n);
+    ids.push(id);
+  }
+  if (ids.length === 0) return [];
+
+  const results = await logsClient.multicall({
+    contracts: ids.map((id) => ({
+      address: DMPAY_DIRECT_ADDRESS,
+      abi: dmpayDirectAbi,
+      functionName: 'groups',
+      args: [id],
+    } as const)),
+  });
+
+  const out: PublicGroup[] = [];
+  ids.forEach((id, i) => {
+    const r = results[i];
+    if (r.status !== 'success') return;
+    const parsed = parseGroupTuple(r.result as unknown as readonly unknown[]);
+    if (!parsed) return;
+    out.push({ ...parsed, id, createdBlock: createdBlock.get(id.toString()) ?? 0n });
+  });
+  return out.sort((a, b) => Number(b.createdBlock - a.createdBlock));
 }
 
 /** Addresses that have paid to join `id` on-chain (for creator-side admission). */

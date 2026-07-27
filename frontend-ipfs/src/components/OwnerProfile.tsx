@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useEnsName, useEnsAvatar, useEnsText, useReadContract } from 'wagmi';
 import { normalize } from 'viem/ens';
 import { parseAbiItem, formatUnits, formatEther } from 'viem';
-import { Globe, AtSign, Code2, Settings as SettingsIcon, MessageCircle, Infinity as InfinityIcon, ShieldCheck, ExternalLink, Loader2, BadgePlus, Pencil, X } from 'lucide-react';
+import { Globe, AtSign, Code2, Settings as SettingsIcon, MessageCircle, Infinity as InfinityIcon, ShieldCheck, ExternalLink, Loader2, BadgePlus, Pencil, X, Users, Plus } from 'lucide-react';
 import { Avatar } from './Avatar';
 import { EfpChip } from './EfpStats';
 import { ShareProfile } from './ShareProfile';
 import { EnsRegister } from './EnsRegister';
 import { EnsRecordsEditor } from './EnsRecordsEditor';
+import { GroupGrid } from './GroupCard';
+import { usePublicGroups, useLocalGroupMeta } from '../hooks/useGroups';
 import { DMPAY_DIRECT_ADDRESS, USDC_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 import { logsClient, DMPAY_V2_DEPLOY_BLOCK } from '../lib/logs';
 
@@ -47,6 +49,11 @@ export function OwnerProfile({ address }: { address: `0x${string}` }) {
   const hasPerDM = usdc > 0n || eth > 0n;
 
   const [supporters, setSupporters] = useState<SupporterRow[] | null>(null);
+
+  // Own profile shows closed and unlinked groups too — the owner is the only
+  // person who can act on a broken one.
+  const { groups, error: groupsError } = usePublicGroups(address, !!address);
+  const groupMeta = useLocalGroupMeta();
 
   useEffect(() => {
     let cancelled = false;
@@ -291,6 +298,42 @@ export function OwnerProfile({ address }: { address: `0x${string}` }) {
             )}
           </aside>
         </div>
+
+        {/* ─────────── PAID GROUPS ─────────── */}
+        <section className="px-6 sm:px-10 py-10 border-t border-border-subtle">
+          <div className="flex items-end justify-between flex-wrap gap-3 mb-5">
+            <div>
+              <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">
+                Your paid groups{groups && groups.length > 0 ? ` · ${groups.length}` : ''}
+              </div>
+              <p className="text-text-secondary text-sm mt-2 max-w-lg leading-relaxed">
+                These show on your public profile and on Discover, so anyone can find and pay to join.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/groups/new')}
+              className="bg-bg-panel hover:bg-bg-hover border border-border-strong text-text-primary rounded-2xl px-5 py-3 font-medium inline-flex items-center gap-2 shrink-0"
+            >
+              <Plus size={14} /> New group
+            </button>
+          </div>
+          <GroupGrid
+            groups={groups}
+            meta={groupMeta}
+            error={groupsError}
+            showCreator={false}
+            loadingLabel="Scanning your groups…"
+            empty={
+              <div className="bg-bg-panel border border-border-subtle rounded-3xl p-10 text-center">
+                <Users size={20} className="text-text-muted mx-auto mb-3" />
+                <div className="text-text-primary font-medium mb-1">No paid groups yet.</div>
+                <div className="text-text-secondary text-sm">
+                  Create one and it appears here, on your profile, and on Discover.
+                </div>
+              </div>
+            }
+          />
+        </section>
       </article>
 
       {panel !== 'none' && (

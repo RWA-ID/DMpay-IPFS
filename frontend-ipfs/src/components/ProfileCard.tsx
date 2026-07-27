@@ -6,6 +6,9 @@ import { Globe, AtSign, Code2, Send, Infinity as InfinityIcon, MessageCircle, Sh
 import { Avatar } from './Avatar';
 import { EfpChip } from './EfpStats';
 import { ShareProfile } from './ShareProfile';
+import { GroupGrid } from './GroupCard';
+import { usePublicGroups, useLocalGroupMeta } from '../hooks/useGroups';
+import { hasXmtpId, xmtpIdKey } from '../lib/groups';
 import { DMPAY_DIRECT_ADDRESS, DMPAY_DIRECT_V1_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 
 export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
@@ -57,6 +60,12 @@ export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
 
   const { address: me, isConnected } = useAccount();
   const isSelf = me && address && me.toLowerCase() === address.toLowerCase();
+
+  // Groups this profile has created. Broken ones (never linked to XMTP) are
+  // hidden from visitors — following them only leads to a dead end.
+  const { groups: allGroups, error: groupsError } = usePublicGroups(address, !!address);
+  const groupMeta = useLocalGroupMeta();
+  const groups = allGroups?.filter(g => g.active && hasXmtpId(g.xmtpGroupId)) ?? null;
 
   function handleDM(tier?: 'usdc' | 'eth' | 'lifetimeUsdc' | 'lifetimeEth') {
     if (!address) return;
@@ -191,6 +200,33 @@ export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
           </div>
         )}
       </section>
+
+      {/* PAID GROUPS — only when there's something to show (or something broke) */}
+      {((groups && groups.length > 0) || groupsError) && (
+        <section className="px-7 sm:px-10 py-7 border-t border-border-subtle">
+          <div className="flex items-baseline justify-between mb-4">
+            <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">
+              Paid groups{groups && groups.length > 0 ? ` · ${groups.length}` : ''}
+            </div>
+            <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-muted">
+              One-time seat
+            </div>
+          </div>
+          <GroupGrid
+            groups={groups}
+            meta={groupMeta}
+            error={groupsError}
+            showCreator={false}
+            empty={null}
+            loadingLabel="Loading groups…"
+          />
+          {groups?.some(g => !groupMeta.get(xmtpIdKey(g.xmtpGroupId))?.name) && (
+            <div className="text-[11px] text-text-muted mt-3 leading-snug">
+              Group names and images live in the encrypted XMTP group — they appear once you're a member.
+            </div>
+          )}
+        </section>
+      )}
 
       {/* CTA */}
       <footer className="px-7 sm:px-10 py-6">
