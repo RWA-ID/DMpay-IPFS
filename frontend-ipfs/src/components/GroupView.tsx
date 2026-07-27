@@ -2,17 +2,21 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAccount, useReadContract } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
-import { ArrowLeft, Users, Loader2, AlertCircle, Clock, Copy, Check } from 'lucide-react';
+import { ArrowLeft, Users, Loader2, AlertCircle, Clock, Copy, Check, Pencil } from 'lucide-react';
 import type { Group } from '@xmtp/browser-sdk';
 import { DMPAY_DIRECT_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 import {
-  parseGroupTuple, bytes32ToXmtpId, hasXmtpId, fetchGroupJoiners, type OnchainGroup,
+  parseGroupTuple, bytes32ToXmtpId, xmtpIdKey, hasXmtpId, fetchGroupJoiners, type OnchainGroup,
 } from '../lib/groups';
 import { ethIdentifier } from '../lib/xmtp';
 import { useXmtpClient } from '../hooks/useXmtpClient';
 import { XmtpChat } from './XmtpChat';
 import { GroupPaywall } from './GroupPaywall';
 import { siteUrl } from '../lib/site';
+import { GroupAvatar } from './GroupAvatar';
+import { GroupSettings } from './GroupSettings';
+
+export type GroupMeta = { name: string | null; imageUrl: string | null };
 
 export function GroupView() {
   const { id: idParam } = useParams<{ id: string }>();
@@ -41,6 +45,10 @@ export function GroupView() {
 
   const group: OnchainGroup | null = parseGroupTuple(groupTuple as readonly unknown[] | undefined);
   const isCreator = !!address && !!group && group.creator.toLowerCase() === address.toLowerCase();
+
+  const [meta, setMeta] = useState<GroupMeta>({ name: null, imageUrl: null });
+  const [convo, setConvo] = useState<Group<unknown> | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const onJoined = useCallback(() => {
     refetchMember();
@@ -78,13 +86,38 @@ export function GroupView() {
     return <Notice title="Group closed" body="The creator has closed this group. Existing messages stay in your XMTP inbox." onBack={() => navigate('/inbox')} />;
   }
 
-  const groupName = `Group #${id.toString()}`;
+  const groupName = meta.name || `Group #${id.toString()}`;
 
   return (
     <main className="flex-1 flex flex-col bg-bg-base min-h-0">
-      <GroupHeader id={id} group={group} isCreator={isCreator} onBack={() => navigate('/inbox')} />
+      <GroupHeader
+        id={id}
+        group={group}
+        name={groupName}
+        imageUrl={meta.imageUrl}
+        isCreator={isCreator}
+        canEdit={isCreator && !!convo}
+        onEdit={() => setSettingsOpen(true)}
+        onBack={() => navigate('/inbox')}
+      />
+      {settingsOpen && convo && (
+        <GroupSettings
+          convo={convo}
+          initial={meta}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={(m) => { setMeta(m); setSettingsOpen(false); }}
+        />
+      )}
       {isMember || isCreator ? (
-        <GroupChat id={id} group={group} groupName={groupName} isCreator={isCreator} client={client} />
+        <GroupChat
+          id={id}
+          group={group}
+          groupName={groupName}
+          isCreator={isCreator}
+          client={client}
+          onMeta={setMeta}
+          onConvo={setConvo}
+        />
       ) : (
         <GroupPaywall id={id} group={group} groupName={groupName} onJoined={onJoined} />
       )}
@@ -98,12 +131,14 @@ export function GroupView() {
  * group yet. XMTP has no way for a payer to add themselves, so the creator's
  * client is the reconciler; members appear once the creator opens the app.
  */
-function GroupChat({ id, group, groupName, isCreator, client }: {
+function GroupChat({ id, group, groupName, isCreator, client, onMeta, onConvo }: {
   id: bigint;
   group: OnchainGroup;
   groupName: string;
   isCreator: boolean;
   client: ReturnType<typeof useXmtpClient>['client'];
+  onMeta?: (meta: GroupMeta) => void;
+  onConvo?: (convo: Group<unknown> | null) => void;
 }) {
   const { init, initializing } = useXmtpClient();
   const [convo, setConvo] = useState<Group<unknown> | null>(null);
@@ -124,7 +159,14 @@ function GroupChat({ id, group, groupName, isCreator, client }: {
         setState('loading');
         await client.conversations.sync().catch((e) => console.warn('conversations sync failed', e));
         const xmtpId = bytes32ToXmtpId(group.xmtpGroupId);
-        const found = (await client.conversations.getConversationById(xmtpId)) as Group<unknown> | undefined;
+        let found = (await client.conversations.getConversationById(xmtpId)) as Group<unknown> | undefined;
+        // Fallback: match against the joined group list in padded space, so a
+        // change in how ids are encoded can't strand an existing group.
+        if (!found) {
+          const wanted = xmtpIdKey(group.xmtpGroupId);
+          const all = await client.conversations.listGroups().catch(() => [] as Group<unknown>[]);
+          found = all.find((g) => xmtpIdKey(g.id) === wanted);
+        }
         if (cancelled) return;
         if (!found) {
           // Paid on-chain but the creator hasn't added this inbox to the
@@ -133,6 +175,11 @@ function GroupChat({ id, group, groupName, isCreator, client }: {
           return;
         }
         setConvo(found);
+        onConvo?.(found);
+        onMeta?.({
+          name: ((found as any).name as string | undefined) || null,
+          imageUrl: ((found as any).imageUrl as string | undefined) || null,
+        });
         setState('ready');
       } catch (e: any) {
         console.error('group load failed', e);
@@ -142,7 +189,7 @@ function GroupChat({ id, group, groupName, isCreator, client }: {
       }
     })();
     return () => { cancelled = true; };
-  }, [client, group.xmtpGroupId, linked]);
+  }, [client, group.xmtpGroupId, linked, onMeta, onConvo]);
 
   // Creator-side admission: add every on-chain joiner missing from the XMTP group.
   const reconcile = useCallback(async () => {
@@ -269,10 +316,14 @@ function GroupChat({ id, group, groupName, isCreator, client }: {
   );
 }
 
-function GroupHeader({ id, group, isCreator, onBack }: {
+function GroupHeader({ id, group, name, imageUrl, isCreator, canEdit, onEdit, onBack }: {
   id: bigint;
   group: OnchainGroup;
+  name: string;
+  imageUrl: string | null;
   isCreator: boolean;
+  canEdit: boolean;
+  onEdit: () => void;
   onBack: () => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -297,17 +348,24 @@ function GroupHeader({ id, group, isCreator, onBack }: {
       >
         <ArrowLeft size={20} />
       </button>
-      <div className="w-10 h-10 rounded-full bg-bg-elevated border border-border-subtle flex items-center justify-center shrink-0">
-        <Users size={18} className="text-text-secondary" />
-      </div>
+      <GroupAvatar src={imageUrl} seed={id.toString()} name={name} size={40} />
       <div className="flex-1 min-w-0">
-        <div className="font-semibold truncate">Group #{id.toString()}</div>
+        <div className="font-semibold truncate">{name}</div>
         <div className="text-xs text-text-secondary truncate">
           {group.memberCount.toString()}
           {group.capacity > 0n ? ` / ${group.capacity.toString()}` : ''} members
           {isCreator ? ' · you created this' : ''}
         </div>
       </div>
+      {canEdit && (
+        <button
+          onClick={onEdit}
+          className="font-mono text-[11px] text-text-secondary hover:text-text-primary border border-border-subtle rounded-full px-3 py-1.5 inline-flex items-center gap-1.5 shrink-0"
+          title="Edit group name and image"
+        >
+          <Pencil size={11} /> Edit
+        </button>
+      )}
       <button
         onClick={copy}
         className="font-mono text-[11px] text-text-secondary hover:text-text-primary border border-border-subtle rounded-full px-3 py-1.5 inline-flex items-center gap-1.5 shrink-0"

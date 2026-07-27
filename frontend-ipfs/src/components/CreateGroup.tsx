@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { parseUnits, parseEther, decodeEventLog } from 'viem';
-import { ArrowLeft, Users, Loader2, CheckCircle2, AlertCircle, Sparkles, Copy } from 'lucide-react';
+import { ArrowLeft, Users, Loader2, CheckCircle2, AlertCircle, Sparkles, Copy, Image as ImageIcon } from 'lucide-react';
 import { DMPAY_DIRECT_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 import { useXmtpClient } from '../hooks/useXmtpClient';
 import { siteUrl } from '../lib/site';
+import { uploadPublicToPinata } from '../lib/pinata';
+import { GroupAvatar } from './GroupAvatar';
 
 export function CreateGroup() {
   const navigate = useNavigate();
@@ -19,6 +21,10 @@ export function CreateGroup() {
   const [usdc, setUsdc] = useState('');
   const [eth, setEth] = useState('');
   const [capacity, setCapacity] = useState('');
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   const createTx = useWriteContract();
   const createReceipt = useWaitForTransactionReceipt({ hash: createTx.data });
@@ -61,9 +67,13 @@ export function CreateGroup() {
         // as they pay to join (see [[project_dmpay_ipfs]] creator-reconciliation pattern).
         // Using createGroup with empty inboxIds — joiners will be added by the
         // creator's tab as they pay on-chain.
+        // NOTE: the wasm bindings expect groupName / groupDescription /
+        // groupImageUrlSquare — plain `name`/`description` are silently
+        // dropped, which is why early groups showed up unnamed.
         const grp = await xmtp.conversations.createGroup([], {
-          name: name.trim(),
-          description: description.trim() || undefined,
+          groupName: name.trim(),
+          groupDescription: description.trim() || undefined,
+          groupImageUrlSquare: imageUrl ?? undefined,
         } as any);
         const xId = grp.id;
         setXmtpGroupId(xId);
@@ -83,6 +93,26 @@ export function CreateGroup() {
       }
     })();
   }, [groupId, xmtp, xmtpGroupId, creatingXmtp, linkTx, name, description]);
+
+  async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setImageError('Pick an image file.'); return; }
+    if (file.size > 5 * 1024 * 1024) { setImageError('Image too large (max 5 MB).'); return; }
+    setImageError(null);
+    setImagePreview(URL.createObjectURL(file));
+    setUploadingImage(true);
+    try {
+      setImageUrl(await uploadPublicToPinata(file));
+    } catch (err: any) {
+      console.error('group image upload failed', err);
+      setImageError(err?.message ?? 'Upload failed');
+      setImagePreview(null);
+    } finally {
+      setUploadingImage(false);
+    }
+  }
 
   function submit() {
     if (!address || !canSubmit) return;
@@ -200,6 +230,20 @@ export function CreateGroup() {
               maxLength={280}
               className="w-full bg-bg-elevated text-text-primary placeholder:text-text-muted rounded-xl px-4 py-3 focus:outline-none focus:ring-1 focus:ring-brand resize-none"
             />
+          </Field>
+
+          <Field label="Group image" hint="Optional. Pinned to IPFS and shown to every member.">
+            <div className="flex items-center gap-4">
+              <GroupAvatar src={imagePreview ?? imageUrl} seed={name || 'new-group'} name={name} size={56} />
+              <div className="flex-1">
+                <label className="inline-flex items-center gap-2 bg-bg-elevated hover:bg-bg-hover text-text-primary rounded-xl px-4 py-2.5 text-sm cursor-pointer">
+                  {uploadingImage ? <Loader2 size={14} className="animate-spin" /> : <ImageIcon size={14} />}
+                  {uploadingImage ? 'Uploading…' : imageUrl ? 'Replace image' : 'Choose image'}
+                  <input type="file" accept="image/*" onChange={onPickImage} className="hidden" disabled={uploadingImage} />
+                </label>
+                {imageError && <div className="text-danger text-xs mt-2">{imageError}</div>}
+              </div>
+            </div>
           </Field>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

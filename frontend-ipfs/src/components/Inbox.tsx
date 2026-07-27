@@ -8,7 +8,8 @@ import type { Dm, Group, DecodedMessage } from '@xmtp/browser-sdk';
 import { ConsentState } from '@xmtp/browser-sdk';
 import { useXmtpClient } from '../hooks/useXmtpClient';
 import { Avatar } from './Avatar';
-import { fetchXmtpIdToGroupId } from '../lib/groups';
+import { GroupAvatar } from './GroupAvatar';
+import { fetchXmtpIdToGroupId, xmtpIdKey } from '../lib/groups';
 
 type DmRow = {
   kind: 'dm';
@@ -25,6 +26,7 @@ type GroupRow = {
   /** On-chain group id, resolved from GroupXmtpIdSet logs. Null = not a DMpay group. */
   onchainId: bigint | null;
   name: string | null;
+  imageUrl: string | null;
   lastMessage: DecodedMessage<unknown> | null;
 };
 
@@ -86,8 +88,9 @@ export function Inbox() {
               kind: 'group',
               id: g.id,
               conversation: g,
-              onchainId: idMap.get(g.id.toLowerCase()) ?? null,
+              onchainId: idMap.get(xmtpIdKey(g.id)) ?? null,
               name: ((g as any).name as string | undefined) || null,
+              imageUrl: ((g as any).imageUrl as string | undefined) || null,
               lastMessage,
             };
           })
@@ -212,9 +215,8 @@ function GroupInboxRow({ row, onOpen }: { row: GroupRow; onOpen: (groupId: strin
       title={openable ? undefined : 'This XMTP group was not created through DMpay'}
       className="w-full py-4 flex items-center gap-4 text-left disabled:opacity-50 hover:bg-bg-elevated/40 transition-colors px-2 -mx-2 rounded-xl"
     >
-      <div className="w-12 h-12 rounded-full bg-bg-elevated border border-border-subtle flex items-center justify-center shrink-0">
-        <Users size={20} className="text-text-secondary" />
-      </div>
+      <GroupAvatar src={row.imageUrl} seed={row.id} size={48} name={row.name} />
+
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between gap-3">
           <span className="font-mono text-[15px] font-medium text-text-primary truncate">{display}</span>

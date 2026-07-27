@@ -33,17 +33,36 @@ export function parseGroupTuple(t: readonly unknown[] | undefined): OnchainGroup
 }
 
 /**
- * XMTP group ids are 32-byte hex strings with no `0x`. CreateGroup stores them
- * on-chain as bytes32 via padStart(64,'0'); these two are its inverse pair.
+ * XMTP group ids are **16-byte** hex strings (32 chars, no `0x`) — not 32-byte.
+ * CreateGroup stores them on-chain as bytes32 via padStart(64,'0'), so the
+ * chain value carries 32 leading zeros that are not part of the id.
  */
+const XMTP_ID_HEX_LEN = 32;
+
 export function xmtpIdToBytes32(id: string): `0x${string}` {
   const hex = id.startsWith('0x') ? id.slice(2) : id;
   const trimmed = hex.length > 64 ? hex.slice(0, 64) : hex.padStart(64, '0');
   return `0x${trimmed}` as `0x${string}`;
 }
 
+/** Inverse of xmtpIdToBytes32: drop the zero padding the encoder added. */
 export function bytes32ToXmtpId(b: `0x${string}`): string {
-  return b.startsWith('0x') ? b.slice(2) : b;
+  const hex = (b.startsWith('0x') ? b.slice(2) : b).toLowerCase();
+  const stripped = hex.replace(/^0+/, '');
+  // Re-pad to the natural width so ids that genuinely start with a zero nibble
+  // aren't truncated by the strip above.
+  return stripped.length <= XMTP_ID_HEX_LEN
+    ? stripped.padStart(XMTP_ID_HEX_LEN, '0')
+    : stripped.padStart(64, '0');
+}
+
+/**
+ * Canonical key for comparing an XMTP id with an on-chain bytes32. Normalising
+ * *up* into padded space is lossless, so equality never depends on guessing how
+ * wide the original id was.
+ */
+export function xmtpIdKey(idOrBytes32: string): string {
+  return xmtpIdToBytes32(idOrBytes32).slice(2).toLowerCase();
 }
 
 export function hasXmtpId(b: `0x${string}` | undefined): boolean {
@@ -68,7 +87,7 @@ export async function fetchXmtpIdToGroupId(): Promise<Map<string, bigint>> {
       const args = log.args;
       if (args?.id === undefined || !args.xmtpGroupId) continue;
       // Later events win — a creator can re-link a group.
-      map.set(bytes32ToXmtpId(args.xmtpGroupId).toLowerCase(), args.id);
+      map.set(xmtpIdKey(args.xmtpGroupId), args.id);
     }
   } catch (e) {
     console.warn('GroupXmtpIdSet scan failed', e);
