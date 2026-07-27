@@ -7,6 +7,7 @@ import {
   isAttachment,
   isRemoteAttachment,
   type Dm,
+  type Group,
   type DecodedMessage,
 } from '@xmtp/browser-sdk';
 
@@ -28,13 +29,16 @@ import { uploadEncryptedToPinata, fetchAttachment } from '../lib/pinata';
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 
-export function XmtpChat({ recipient, recipientName }: {
-  recipient: `0x${string}`;
+export function XmtpChat({ recipient, recipientName, conversation: provided }: {
+  /** DM mode: the peer to resolve a 1:1 conversation with. */
+  recipient?: `0x${string}`;
   recipientName: string;
+  /** Pre-resolved conversation (groups). When set, DM resolution is skipped. */
+  conversation?: Dm<unknown> | Group<unknown>;
 }) {
   const { client, init, initializing, error, revokeAndRetry, needsRevoke } = useXmtpClient();
   useAccount();
-  const [conversation, setConversation] = useState<Dm<unknown> | null>(null);
+  const [conversation, setConversation] = useState<Dm<unknown> | Group<unknown> | null>(null);
   const [messages, setMessages] = useState<DecodedMessage<unknown>[]>([]);
   const [myInboxId, setMyInboxId] = useState<string | null>(null);
   const [setupError, setSetupError] = useState<string | null>(null);
@@ -62,26 +66,38 @@ export function XmtpChat({ recipient, recipientName }: {
     let cancelled = false;
     (async () => {
       try {
-        const identifier = ethIdentifier(recipient);
-        const reachableMap = await client.canMessage([identifier]);
-        const reachable = reachableMap.get(recipient.toLowerCase()) === true;
+        let convo: Dm<unknown> | Group<unknown>;
+
+        if (provided) {
+          // Group mode: the caller already established membership, so there is
+          // no single peer to probe with canMessage.
+          setRecipientReachable(true);
+          convo = provided;
+        } else {
+          if (!recipient) return;
+          const identifier = ethIdentifier(recipient);
+          const reachableMap = await client.canMessage([identifier]);
+          const reachable = reachableMap.get(recipient.toLowerCase()) === true;
+          if (cancelled) return;
+          setRecipientReachable(reachable);
+          if (!reachable) return;
+
+          await client.conversations.sync().catch((e) => console.warn('conversations sync failed', e));
+
+          let dm = await client.conversations.fetchDmByIdentifier(identifier);
+          if (!dm) dm = await client.conversations.createDmWithIdentifier(identifier);
+          convo = dm;
+        }
+
         if (cancelled) return;
-        setRecipientReachable(reachable);
-        if (!reachable) return;
+        setConversation(convo);
 
-        await client.conversations.sync().catch((e) => console.warn('conversations sync failed', e));
-
-        let dm = await client.conversations.fetchDmByIdentifier(identifier);
-        if (!dm) dm = await client.conversations.createDmWithIdentifier(identifier);
-        if (cancelled) return;
-        setConversation(dm);
-
-        await dm.sync().catch((e) => console.warn('dm sync failed', e));
-        const initial = await dm.messages();
+        await convo.sync().catch((e) => console.warn('conversation sync failed', e));
+        const initial = await convo.messages();
         if (cancelled) return;
         setMessages(initial);
 
-        const stream = await dm.stream({
+        const stream = await convo.stream({
           onValue: (msg) => {
             if (cancelled || !msg) return;
             setMessages((prev) => [...prev, msg]);
@@ -98,7 +114,7 @@ export function XmtpChat({ recipient, recipientName }: {
       streamRef.current?.end().catch(() => {});
       streamRef.current = null;
     };
-  }, [client, recipient]);
+  }, [client, recipient, provided]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -263,7 +279,9 @@ export function XmtpChat({ recipient, recipientName }: {
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-3">
         {messages.length === 0 && (
           <div className="text-center text-text-muted text-sm py-12">
-            End-to-end encrypted. Say hello to {recipientName} 👋
+            {provided
+              ? `End-to-end encrypted. Start the conversation in ${recipientName} 👋`
+              : `End-to-end encrypted. Say hello to ${recipientName} 👋`}
           </div>
         )}
         {messages.map((m) => {

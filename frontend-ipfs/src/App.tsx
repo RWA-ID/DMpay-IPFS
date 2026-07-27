@@ -16,6 +16,7 @@ import { Inbox } from './components/Inbox';
 import { Discover } from './components/Discover';
 import { XmtpAutoInit } from './components/XmtpAutoInit';
 import { CreateGroup } from './components/CreateGroup';
+import { GroupView } from './components/GroupView';
 import { Privacy } from './components/Privacy';
 import { Terms } from './components/Terms';
 
@@ -49,7 +50,7 @@ function Shell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { address, isConnected } = useAccount();
-  const inChat = location.pathname.startsWith('/c/');
+  const inChat = location.pathname.startsWith('/c/') || location.pathname.startsWith('/g/');
 
   // Profile-first onboarding: when a user connects from the landing page,
   // take them to their own profile (where pricing + ENS setup live).
@@ -72,6 +73,7 @@ function Shell() {
             <ChatList className="hidden md:flex w-80" />
             <Routes>
               <Route path="/c/:address" element={<ChatView />} />
+              <Route path="/g/:id" element={<GroupView />} />
             </Routes>
           </>
         ) : (

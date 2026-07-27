@@ -4,16 +4,33 @@ import { useEnsName, useEnsAvatar } from 'wagmi';
 import { normalize } from 'viem/ens';
 import { isAddress } from 'viem';
 import { Loader2, MessageSquare, Inbox as InboxIcon, Zap, RefreshCw, Search, Users } from 'lucide-react';
-import type { Dm, DecodedMessage } from '@xmtp/browser-sdk';
+import type { Dm, Group, DecodedMessage } from '@xmtp/browser-sdk';
 import { ConsentState } from '@xmtp/browser-sdk';
 import { useXmtpClient } from '../hooks/useXmtpClient';
 import { Avatar } from './Avatar';
+import { fetchXmtpIdToGroupId } from '../lib/groups';
 
-type Row = {
+type DmRow = {
+  kind: 'dm';
+  id: string;
   conversation: Dm<unknown>;
   peerAddress: string | null;
   lastMessage: DecodedMessage<unknown> | null;
 };
+
+type GroupRow = {
+  kind: 'group';
+  id: string;
+  conversation: Group<unknown>;
+  /** On-chain group id, resolved from GroupXmtpIdSet logs. Null = not a DMpay group. */
+  onchainId: bigint | null;
+  name: string | null;
+  lastMessage: DecodedMessage<unknown> | null;
+};
+
+type Row = DmRow | GroupRow;
+
+const lastMessageTs = (r: Row) => r.lastMessage?.sentAtNs ?? 0n;
 
 export function Inbox() {
   const { client, init, initializing } = useXmtpClient();
@@ -32,11 +49,17 @@ export function Inbox() {
         await client.conversations.syncAll([
           ConsentState.Allowed, ConsentState.Unknown, ConsentState.Denied,
         ]);
-        const dms = await client.conversations.listDms({
-          consentStates: [ConsentState.Allowed, ConsentState.Unknown, ConsentState.Denied],
-        } as any);
-        const enriched: Row[] = await Promise.all(
-          dms.map(async (dm) => {
+        const consentStates = [ConsentState.Allowed, ConsentState.Unknown, ConsentState.Denied];
+        const [dms, groups] = await Promise.all([
+          client.conversations.listDms({ consentStates } as any),
+          client.conversations.listGroups({ consentStates } as any).catch((e: unknown) => {
+            console.warn('listGroups failed', e);
+            return [] as Group<unknown>[];
+          }),
+        ]);
+
+        const dmRows: Row[] = await Promise.all(
+          dms.map(async (dm): Promise<DmRow> => {
             await dm.sync().catch(() => {});
             const msgs = await dm.messages().catch(() => [] as DecodedMessage<unknown>[]);
             const lastMessage = [...msgs].reverse().find((m) => typeof m.content === 'string') ?? msgs[msgs.length - 1] ?? null;
@@ -47,12 +70,33 @@ export function Inbox() {
               const eth = peer?.accountIdentifiers?.find((i: any) => i.identifierKind === 0);
               peerAddress = eth?.identifier ?? null;
             } catch { /* ignore */ }
-            return { conversation: dm, peerAddress, lastMessage };
+            return { kind: 'dm', id: dm.id, conversation: dm, peerAddress, lastMessage };
           })
         );
+
+        // Groups only carry their XMTP id; the on-chain id (for the /g/:id link)
+        // lives in GroupXmtpIdSet logs. Skip the scan entirely when there are none.
+        const idMap = groups.length > 0 ? await fetchXmtpIdToGroupId() : new Map<string, bigint>();
+        const groupRows: Row[] = await Promise.all(
+          groups.map(async (g): Promise<GroupRow> => {
+            await g.sync().catch(() => {});
+            const msgs = await g.messages().catch(() => [] as DecodedMessage<unknown>[]);
+            const lastMessage = [...msgs].reverse().find((m) => typeof m.content === 'string') ?? msgs[msgs.length - 1] ?? null;
+            return {
+              kind: 'group',
+              id: g.id,
+              conversation: g,
+              onchainId: idMap.get(g.id.toLowerCase()) ?? null,
+              name: ((g as any).name as string | undefined) || null,
+              lastMessage,
+            };
+          })
+        );
+
         if (cancelled) return;
-        enriched.sort((a, b) => Number((b.lastMessage?.sentAtNs ?? 0n) - (a.lastMessage?.sentAtNs ?? 0n)));
-        setRows(enriched);
+        const all = [...dmRows, ...groupRows];
+        all.sort((a, b) => Number(lastMessageTs(b) - lastMessageTs(a)));
+        setRows(all);
       } catch (e: any) {
         console.error('inbox load failed', e);
         setError(e?.message ?? 'Failed to load conversations');
@@ -140,9 +184,13 @@ export function Inbox() {
 
         {rows && rows.length > 0 && (
           <div className="mt-8 divide-y divide-border-subtle border-y border-border-subtle">
-            {rows.map((r) => (
-              <InboxRow key={r.conversation.id} row={r} onOpen={(addr) => navigate(`/c/${addr}`)} />
-            ))}
+            {rows.map((r) =>
+              r.kind === 'group' ? (
+                <GroupInboxRow key={r.id} row={r} onOpen={(gid) => navigate(`/g/${gid}`)} />
+              ) : (
+                <InboxRow key={r.id} row={r} onOpen={(addr) => navigate(`/c/${addr}`)} />
+              )
+            )}
           </div>
         )}
       </div>
@@ -150,18 +198,51 @@ export function Inbox() {
   );
 }
 
-function InboxRow({ row, onOpen }: { row: Row; onOpen: (addr: string) => void }) {
+function GroupInboxRow({ row, onOpen }: { row: GroupRow; onOpen: (groupId: string) => void }) {
+  const display = row.name || (row.onchainId !== null ? `Group #${row.onchainId.toString()}` : 'Group');
+  const preview = typeof row.lastMessage?.content === 'string' ? row.lastMessage.content : '';
+  const dateLabel = formatWhen(row.lastMessage);
+  // Groups created outside DMpay have no on-chain id, so there's no /g/ page for them.
+  const openable = row.onchainId !== null;
+
+  return (
+    <button
+      onClick={() => openable && onOpen(row.onchainId!.toString())}
+      disabled={!openable}
+      title={openable ? undefined : 'This XMTP group was not created through DMpay'}
+      className="w-full py-4 flex items-center gap-4 text-left disabled:opacity-50 hover:bg-bg-elevated/40 transition-colors px-2 -mx-2 rounded-xl"
+    >
+      <div className="w-12 h-12 rounded-full bg-bg-elevated border border-border-subtle flex items-center justify-center shrink-0">
+        <Users size={20} className="text-text-secondary" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="font-mono text-[15px] font-medium text-text-primary truncate">{display}</span>
+          <span className="font-mono text-[11px] text-text-muted shrink-0">{dateLabel}</span>
+        </div>
+        <div className="text-sm text-text-secondary truncate mt-1">
+          {preview || (openable ? 'Paid group · no messages yet' : 'Group · not a DMpay group')}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function formatWhen(msg: DecodedMessage<unknown> | null): string {
+  if (!msg) return '';
+  const ts = new Date(Number(msg.sentAtNs / 1_000_000n));
+  return Date.now() - ts.getTime() < 24 * 3600_000
+    ? ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : ts.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+function InboxRow({ row, onOpen }: { row: DmRow; onOpen: (addr: string) => void }) {
   const peer = row.peerAddress as `0x${string}` | null;
   const { data: ensName } = useEnsName({ address: peer ?? undefined, query: { enabled: !!peer } });
   const { data: avatar } = useEnsAvatar({ name: ensName ? safeNormalize(ensName) : undefined, query: { enabled: !!ensName } });
   const display = ensName ?? (peer ? `${peer.slice(0, 6)}…${peer.slice(-4)}` : 'Unknown peer');
   const preview = typeof row.lastMessage?.content === 'string' ? row.lastMessage.content : '';
-  const ts = row.lastMessage ? new Date(Number(row.lastMessage.sentAtNs / 1_000_000n)) : null;
-  const dateLabel = ts
-    ? (Date.now() - ts.getTime() < 24 * 3600_000
-        ? ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        : ts.toLocaleDateString([], { month: 'short', day: 'numeric' }))
-    : '';
+  const dateLabel = formatWhen(row.lastMessage);
 
   return (
     <button

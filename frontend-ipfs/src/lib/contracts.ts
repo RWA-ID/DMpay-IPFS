@@ -57,6 +57,54 @@ export const dmpayDirectAbi = [
     inputs: [{ name: 'sender', type: 'address' }], outputs: [] },
   { type: 'function', name: 'closeConversation', stateMutability: 'nonpayable',
     inputs: [{ name: 'sender', type: 'address' }], outputs: [] },
+
+  // --- Group reads ---
+  { type: 'function', name: 'groups', stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }],
+    outputs: [
+      { name: 'creator', type: 'address' },
+      { name: 'priceUsdc', type: 'uint256' },
+      { name: 'priceEth', type: 'uint256' },
+      { name: 'capacity', type: 'uint64' },
+      { name: 'memberCount', type: 'uint64' },
+      { name: 'active', type: 'bool' },
+      { name: 'xmtpGroupId', type: 'bytes32' },
+    ]},
+  { type: 'function', name: 'isGroupMember', stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }, { name: '', type: 'address' }],
+    outputs: [{ type: 'bool' }] },
+  { type: 'function', name: 'nextGroupId', stateMutability: 'view',
+    inputs: [], outputs: [{ type: 'uint256' }] },
+
+  // --- Events ---
+  // Required: CreateGroup decodes GroupCreated to learn the new id, and the
+  // group view scans GroupXmtpIdSet / GroupJoined. Without these entries
+  // decodeEventLog throws for every log and the create flow stalls silently.
+  { type: 'event', name: 'GroupCreated', inputs: [
+    { name: 'id', type: 'uint256', indexed: true },
+    { name: 'creator', type: 'address', indexed: true },
+    { name: 'priceUsdc', type: 'uint256', indexed: false },
+    { name: 'priceEth', type: 'uint256', indexed: false },
+    { name: 'capacity', type: 'uint64', indexed: false },
+  ]},
+  { type: 'event', name: 'GroupXmtpIdSet', inputs: [
+    { name: 'id', type: 'uint256', indexed: true },
+    { name: 'xmtpGroupId', type: 'bytes32', indexed: false },
+  ]},
+  { type: 'event', name: 'GroupJoined', inputs: [
+    { name: 'id', type: 'uint256', indexed: true },
+    { name: 'member', type: 'address', indexed: true },
+    { name: 'token', type: 'address', indexed: true },
+    { name: 'amountPaid', type: 'uint256', indexed: false },
+    { name: 'fee', type: 'uint256', indexed: false },
+  ]},
+  { type: 'event', name: 'GroupMemberRemoved', inputs: [
+    { name: 'id', type: 'uint256', indexed: true },
+    { name: 'member', type: 'address', indexed: true },
+  ]},
+  { type: 'event', name: 'GroupClosed', inputs: [
+    { name: 'id', type: 'uint256', indexed: true },
+  ]},
 ] as const;
 
 export const erc20Abi = [
