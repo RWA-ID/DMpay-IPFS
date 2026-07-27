@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build --mode ipfs",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:ipfs": "tsc -b && vite build --mode ipfs",
+    "build:pages": "tsc -b && vite build --mode pages",
+    "deploy:pages": "npm run build:pages && wrangler pages deploy dist --project-name=dmpay --branch=dmpay"
   },
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.11",

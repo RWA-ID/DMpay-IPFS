@@ -1,6 +1,3 @@
-# Frontend has its own repo (legacy DMpay-Frontend)
-frontend/
-
 # Dependencies
 node_modules/
 **/node_modules/
@@ -22,6 +19,10 @@ contracts/ignition/deployments/
 .env.local
 .env.*
 !.env.example
+# Build-target config — public URLs only, no secrets. Must be committed or
+# `npm run build:pages` silently produces an IPFS-shaped build (see frontend-ipfs/src/lib/site.ts).
+!.env.pages
+!.env.ipfs
 
 # Logs
 *.log

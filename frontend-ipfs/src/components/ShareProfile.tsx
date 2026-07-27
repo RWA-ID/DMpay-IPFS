@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { Copy, Check, Share2 } from 'lucide-react';
-
-const BASE = 'https://dmpay.eth.link';
+import { profileUrl, profileLabel } from '../lib/site';
 
 export function shareUrlFor(idOrEns: string) {
-  return `${BASE}/#/u/${idOrEns}`;
+  return profileUrl(idOrEns);
 }
 
 export function ShareProfile({
@@ -42,7 +41,7 @@ export function ShareProfile({
           title="Copy share link"
         >
           {copied ? <Check size={12} /> : <Copy size={12} />}
-          <span>{copied ? 'Copied' : `dmpay.eth.link/#/u/${idOrEns}`}</span>
+          <span>{copied ? 'Copied' : profileLabel(idOrEns)}</span>
         </button>
         <a
           href={`https://twitter.com/intent/tweet?text=${tweet}`}
@@ -74,7 +73,7 @@ export function ShareProfile({
       </a>
       {displayName && (
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted self-center ml-1">
-          dmpay.eth.link/#/u/{displayName}
+          {profileLabel(displayName)}
         </span>
       )}
     </div>

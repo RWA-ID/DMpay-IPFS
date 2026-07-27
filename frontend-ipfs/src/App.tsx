@@ -2,8 +2,9 @@ import { useEffect, useRef } from 'react';
 import { WagmiProvider, useAccount } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
-import { HashRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { config } from './lib/wagmi';
+import { CLEAN_URLS } from './lib/site';
 import { TopBar } from './components/TopBar';
 import { Sidebar } from './components/Sidebar';
 import { ChatList } from './components/ChatList';
@@ -15,8 +16,14 @@ import { Inbox } from './components/Inbox';
 import { Discover } from './components/Discover';
 import { XmtpAutoInit } from './components/XmtpAutoInit';
 import { CreateGroup } from './components/CreateGroup';
+import { Privacy } from './components/Privacy';
+import { Terms } from './components/Terms';
 
 const queryClient = new QueryClient();
+
+// Clean paths on app.dmpay.me (Pages rewrites 404s to index.html); hash routing on
+// IPFS gateways, which serve a hard 404 for any path that isn't a real file.
+const Router = CLEAN_URLS ? BrowserRouter : HashRouter;
 
 function App() {
   return (
@@ -29,9 +36,9 @@ function App() {
             borderRadius: 'large',
           })}
         >
-          <HashRouter>
+          <Router>
             <Shell />
-          </HashRouter>
+          </Router>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
@@ -75,6 +82,8 @@ function Shell() {
             <Route path="/inbox" element={<Inbox />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/groups/new" element={<CreateGroup />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
           </Routes>
         )}
       </div>

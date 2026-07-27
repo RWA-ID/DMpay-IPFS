@@ -1,4 +1,5 @@
 import { ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const CONTRACT_ADDRESS = '0xAB2ef1b1A39D2DA7DAC2bCD16238cC1cE5530c52';
 
@@ -19,8 +20,8 @@ export function Footer() {
           <ul className="space-y-2 text-text-secondary">
             <li><a href="#how-it-works" className="hover:text-text-primary">How it works</a></li>
             <li><a href="#who-its-for" className="hover:text-text-primary">Who it's for</a></li>
-            <li><a href="/settings" className="hover:text-text-primary">Set up your profile</a></li>
-            <li><a href="/inbox" className="hover:text-text-primary">Inbox</a></li>
+            <li><Link to="/settings" className="hover:text-text-primary">Set up your profile</Link></li>
+            <li><Link to="/inbox" className="hover:text-text-primary">Inbox</Link></li>
           </ul>
         </div>
 
@@ -65,7 +66,11 @@ export function Footer() {
       </div>
       <div className="border-t border-border-subtle">
         <div className="max-w-6xl mx-auto px-6 py-4 text-xs text-text-muted flex flex-col sm:flex-row justify-between gap-2">
-          <div>© 2026 DMpay. Non-custodial protocol. No accounts. No backend.</div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span>© 2026 DMpay. Non-custodial protocol. No accounts. No backend.</span>
+            <Link to="/privacy" className="hover:text-text-secondary">Privacy</Link>
+            <Link to="/terms" className="hover:text-text-secondary">Terms</Link>
+          </div>
           <div>Protocol fee 2.5% · 97.5% to recipient · Atomic settlement</div>
         </div>
       </div>
