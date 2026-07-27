@@ -26,8 +26,29 @@ export function siteLabel(path: string): string {
   return CLEAN_URLS ? `${SITE_HOST}${path}` : `${SITE_HOST}/#${path}`;
 }
 
-export const profileUrl = (idOrEns: string) => siteUrl(`/u/${idOrEns}`);
-export const profileLabel = (idOrEns: string) => siteLabel(`/u/${idOrEns}`);
+/**
+ * Where links handed to *other people* point.
+ *
+ * Deliberately not the origin the user is on. A link copied from the IPFS
+ * build would otherwise be a gateway URL with a hash route, and a hash is
+ * never sent to the server — so no crawler can read it and every shared group
+ * or profile falls back to the generic DMpay card. app.dmpay.me serves the
+ * same app with clean paths and a Pages function that renders a real preview.
+ *
+ * The tradeoff is explicit: a shared link now depends on that host staying up,
+ * where a dmpay.eth link would outlive it. The app itself stays reachable over
+ * IPFS either way — this only decides which URL gets pasted into a tweet.
+ */
+export const SHARE_URL = (import.meta.env.VITE_SHARE_URL as string | undefined)?.replace(/\/$/, '')
+  ?? 'https://app.dmpay.me';
+export const SHARE_HOST = SHARE_URL.replace(/^https?:\/\//, '');
+
+/** Absolute link for sharing. Always a clean path — SHARE_URL supports them. */
+export const shareUrl = (path: string) => `${SHARE_URL}${path}`;
+export const shareLabel = (path: string) => `${SHARE_HOST}${path}`;
+
+export const profileUrl = (idOrEns: string) => shareUrl(`/u/${idOrEns}`);
+export const profileLabel = (idOrEns: string) => shareLabel(`/u/${idOrEns}`);
 
 /**
  * URL-safe form of a group name, appended to the id purely so a shared link
@@ -53,5 +74,5 @@ export function groupPath(id: bigint | string, name?: string | null): string {
   return `/g/${id.toString()}${slug ? `-${slug}` : ''}`;
 }
 
-export const groupUrl = (id: bigint | string, name?: string | null) => siteUrl(groupPath(id, name));
-export const groupLabel = (id: bigint | string, name?: string | null) => siteLabel(groupPath(id, name));
+export const groupUrl = (id: bigint | string, name?: string | null) => shareUrl(groupPath(id, name));
+export const groupLabel = (id: bigint | string, name?: string | null) => shareLabel(groupPath(id, name));
