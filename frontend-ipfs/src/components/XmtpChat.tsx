@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAccount } from 'wagmi';
+import { useAccount, useEnsName, useEnsAvatar } from 'wagmi';
+import { normalize } from 'viem/ens';
 import { Loader2, Mic, Plus, Smile, Send, AlertCircle, X } from 'lucide-react';
 import {
   encryptAttachment,
@@ -24,17 +25,23 @@ type RemoteAttachment = {
 };
 import EmojiPicker, { type EmojiClickData, Theme as EmojiTheme } from 'emoji-picker-react';
 import { useXmtpClient } from '../hooks/useXmtpClient';
+import { Avatar } from './Avatar';
 import { ethIdentifier } from '../lib/xmtp';
 import { uploadEncryptedToPinata, fetchAttachment } from '../lib/pinata';
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 
-export function XmtpChat({ recipient, recipientName, conversation: provided }: {
+export function XmtpChat({ recipient, recipientName, conversation: provided, senderDirectory }: {
   /** DM mode: the peer to resolve a 1:1 conversation with. */
   recipient?: `0x${string}`;
   recipientName: string;
   /** Pre-resolved conversation (groups). When set, DM resolution is skipped. */
   conversation?: Dm<unknown> | Group<unknown>;
+  /**
+   * Group mode: inboxId -> address, so each message can be attributed. A DM
+   * needs none — the header already names the only other party.
+   */
+  senderDirectory?: Map<string, `0x${string}`>;
 }) {
   const { client, init, initializing, error, revokeAndRetry, needsRevoke } = useXmtpClient();
   useAccount();
@@ -284,10 +291,20 @@ export function XmtpChat({ recipient, recipientName, conversation: provided }: {
               : `End-to-end encrypted. Say hello to ${recipientName} 👋`}
           </div>
         )}
-        {messages.map((m) => {
+        {messages.map((m, i) => {
           const fromMe = !!myInboxId && m.senderInboxId === myInboxId;
+          // Attribute incoming group messages, and only on the first of a run
+          // from the same sender — repeating it on every line is noise.
+          const startsRun = messages[i - 1]?.senderInboxId !== m.senderInboxId;
           return (
-            <MessageBubble key={m.id} message={m} fromMe={fromMe} />
+            <MessageBubble
+              key={m.id}
+              message={m}
+              fromMe={fromMe}
+              inGroup={!!senderDirectory}
+              senderAddress={senderDirectory?.get(m.senderInboxId) ?? null}
+              showSender={startsRun}
+            />
           );
         })}
       </div>
@@ -393,9 +410,12 @@ export function XmtpChat({ recipient, recipientName, conversation: provided }: {
   );
 }
 
-function MessageBubble({ message, fromMe }: {
+function MessageBubble({ message, fromMe, inGroup, senderAddress, showSender }: {
   message: DecodedMessage<unknown>;
   fromMe: boolean;
+  inGroup?: boolean;
+  senderAddress?: `0x${string}` | null;
+  showSender?: boolean;
 }) {
   const time = new Date(Number(message.sentAtNs / 1_000_000n)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const text = typeof message.content === 'string' ? message.content : null;
@@ -404,20 +424,59 @@ function MessageBubble({ message, fromMe }: {
 
   if (!text && !inline && !remote) return null;
 
-  return (
-    <div className={`flex ${fromMe ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-md px-4 py-2.5 rounded-bubble text-sm leading-relaxed break-words ${
-        fromMe ? 'bg-bubble-outgoing text-brand-ink' : 'bg-bubble-incoming text-text-primary'
-      }`}>
-        {text && <div className="whitespace-pre-wrap">{text}</div>}
-        {inline && <InlineImage attachment={inline} />}
-        {remote && <RemoteImage remote={remote} />}
-        <div className={`text-[10px] mt-1 ${fromMe ? 'text-white/60 text-right' : 'text-text-muted'}`}>
-          {time}
-        </div>
+  const bubble = (
+    <div className={`max-w-md px-4 py-2.5 rounded-bubble text-sm leading-relaxed break-words ${
+      fromMe ? 'bg-bubble-outgoing text-brand-ink' : 'bg-bubble-incoming text-text-primary'
+    }`}>
+      {text && <div className="whitespace-pre-wrap">{text}</div>}
+      {inline && <InlineImage attachment={inline} />}
+      {remote && <RemoteImage remote={remote} />}
+      <div className={`text-[10px] mt-1 ${fromMe ? 'text-white/60 text-right' : 'text-text-muted'}`}>
+        {time}
       </div>
     </div>
   );
+
+  if (fromMe) return <div className="flex justify-end">{bubble}</div>;
+
+  // Group mode: gutter reserved for the avatar so a run of messages from the
+  // same person stays aligned under their name.
+  if (inGroup) {
+    return (
+      <div className="flex justify-start gap-2">
+        <div className="w-7 shrink-0">
+          {showSender && <SenderAvatar address={senderAddress ?? null} />}
+        </div>
+        <div className="min-w-0">
+          {showSender && <SenderName address={senderAddress ?? null} inboxId={message.senderInboxId} />}
+          {bubble}
+        </div>
+      </div>
+    );
+  }
+
+  return <div className="flex justify-start">{bubble}</div>;
+}
+
+function SenderAvatar({ address }: { address: `0x${string}` | null }) {
+  const { data: ensName } = useEnsName({ address: address ?? undefined, query: { enabled: !!address } });
+  const { data: avatar } = useEnsAvatar({
+    name: ensName ? safeNormalize(ensName) : undefined,
+    query: { enabled: !!ensName },
+  });
+  const fallback = (ensName ?? address ?? '?').replace(/^0x/, '')[0] ?? '?';
+  return <Avatar src={avatar || undefined} fallback={fallback} size={28} />;
+}
+
+function SenderName({ address, inboxId }: { address: `0x${string}` | null; inboxId: string }) {
+  const { data: ensName } = useEnsName({ address: address ?? undefined, query: { enabled: !!address } });
+  const label = ensName
+    ?? (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : `${inboxId.slice(0, 6)}…`);
+  return <div className="font-mono text-[11px] text-text-muted mb-1 ml-1 truncate">{label}</div>;
+}
+
+function safeNormalize(name: string) {
+  try { return normalize(name); } catch { return undefined; }
 }
 
 function InlineImage({ attachment }: { attachment: Attachment }) {

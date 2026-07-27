@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAccount, useReadContract } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
-import { ArrowLeft, Users, Loader2, AlertCircle, Clock, Copy, Check, Pencil } from 'lucide-react';
+import { ArrowLeft, Users, Loader2, AlertCircle, Clock, Copy, Check, Pencil, ChevronDown } from 'lucide-react';
 import type { Group } from '@xmtp/browser-sdk';
 import { DMPAY_DIRECT_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 import {
@@ -15,6 +15,8 @@ import { GroupPaywall } from './GroupPaywall';
 import { siteUrl } from '../lib/site';
 import { GroupAvatar } from './GroupAvatar';
 import { GroupSettings } from './GroupSettings';
+import { GroupMembers } from './GroupMembers';
+import { useGroupMembers } from '../hooks/useGroupMembers';
 
 export type GroupMeta = { name: string | null; imageUrl: string | null };
 
@@ -49,6 +51,15 @@ export function GroupView() {
   const [meta, setMeta] = useState<GroupMeta>({ name: null, imageUrl: null });
   const [convo, setConvo] = useState<Group<unknown> | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [unreachable, setUnreachable] = useState<number | null>(null);
+
+  const { members, byInboxId, error: membersError, reload: reloadMembers } = useGroupMembers(convo);
+
+  const onReconciled = useCallback((result: { unreachable: number }) => {
+    setUnreachable(result.unreachable);
+    reloadMembers();
+  }, [reloadMembers]);
 
   const onJoined = useCallback(() => {
     refetchMember();
@@ -99,7 +110,20 @@ export function GroupView() {
         canEdit={isCreator && !!convo}
         onEdit={() => setSettingsOpen(true)}
         onBack={() => navigate('/inbox')}
+        canShowMembers={!!convo}
+        membersOpen={membersOpen}
+        onToggleMembers={() => setMembersOpen(o => !o)}
       />
+      {membersOpen && convo && (
+        <GroupMembers
+          members={members}
+          error={membersError}
+          creator={group.creator}
+          me={address}
+          onChainCount={group.memberCount}
+          pendingCount={unreachable}
+        />
+      )}
       {settingsOpen && convo && (
         <GroupSettings
           convo={convo}
@@ -117,6 +141,8 @@ export function GroupView() {
           client={client}
           onMeta={setMeta}
           onConvo={setConvo}
+          senderDirectory={byInboxId}
+          onReconciled={onReconciled}
         />
       ) : (
         <GroupPaywall id={id} group={group} groupName={groupName} onJoined={onJoined} />
@@ -131,7 +157,7 @@ export function GroupView() {
  * group yet. XMTP has no way for a payer to add themselves, so the creator's
  * client is the reconciler; members appear once the creator opens the app.
  */
-function GroupChat({ id, group, groupName, isCreator, client, onMeta, onConvo }: {
+function GroupChat({ id, group, groupName, isCreator, client, onMeta, onConvo, senderDirectory, onReconciled }: {
   id: bigint;
   group: OnchainGroup;
   groupName: string;
@@ -139,6 +165,8 @@ function GroupChat({ id, group, groupName, isCreator, client, onMeta, onConvo }:
   client: ReturnType<typeof useXmtpClient>['client'];
   onMeta?: (meta: GroupMeta) => void;
   onConvo?: (convo: Group<unknown> | null) => void;
+  senderDirectory?: Map<string, `0x${string}`>;
+  onReconciled?: (result: { unreachable: number }) => void;
 }) {
   const { init, initializing } = useXmtpClient();
   const [convo, setConvo] = useState<Group<unknown> | null>(null);
@@ -195,6 +223,7 @@ function GroupChat({ id, group, groupName, isCreator, client, onMeta, onConvo }:
   const reconcile = useCallback(async () => {
     if (!client || !convo || !isCreator || admitting) return;
     setAdmitting(true);
+    let unreachableCount = 0;
     try {
       const joiners = await fetchGroupJoiners(id);
       if (joiners.length === 0) { setAdmitted(0); return; }
@@ -213,6 +242,7 @@ function GroupChat({ id, group, groupName, isCreator, client, onMeta, onConvo }:
       // rejects the whole batch if any identity is unreachable.
       const reachable = await client.canMessage(missing.map((a) => ethIdentifier(a)));
       const addable = missing.filter((a) => reachable.get(a.toLowerCase()) === true);
+      unreachableCount = missing.length - addable.length;
       if (addable.length === 0) { setAdmitted(0); return; }
 
       await (convo as any).addMembersByIdentifiers(addable.map((a) => ethIdentifier(a)));
@@ -222,8 +252,10 @@ function GroupChat({ id, group, groupName, isCreator, client, onMeta, onConvo }:
       setErrorMsg(e?.message ?? 'Failed to add paid members');
     } finally {
       setAdmitting(false);
+      // Always refresh the roster: even a no-op run confirms who is in.
+      onReconciled?.({ unreachable: unreachableCount });
     }
-  }, [client, convo, isCreator, id, admitting]);
+  }, [client, convo, isCreator, id, admitting, onReconciled]);
 
   // Run once automatically when the creator opens the group.
   useEffect(() => {
@@ -299,8 +331,8 @@ function GroupChat({ id, group, groupName, isCreator, client, onMeta, onConvo }:
               : admitted === null
                 ? 'You’re the creator — paid members are added automatically.'
                 : admitted > 0
-                  ? `Added ${admitted} paid member${admitted === 1 ? '' : 's'}.`
-                  : 'All paid members are in the group.'}
+                  ? `Added ${admitted} paid member${admitted === 1 ? '' : 's'} — tap the member count to see the roster.`
+                  : 'All paid members are in the group — tap the member count to see who.'}
           </span>
           <button
             onClick={reconcile}
@@ -311,12 +343,12 @@ function GroupChat({ id, group, groupName, isCreator, client, onMeta, onConvo }:
           </button>
         </div>
       )}
-      {convo && <XmtpChat conversation={convo} recipientName={groupName} />}
+      {convo && <XmtpChat conversation={convo} recipientName={groupName} senderDirectory={senderDirectory} />}
     </>
   );
 }
 
-function GroupHeader({ id, group, name, imageUrl, isCreator, canEdit, onEdit, onBack }: {
+function GroupHeader({ id, group, name, imageUrl, isCreator, canEdit, onEdit, onBack, canShowMembers, membersOpen, onToggleMembers }: {
   id: bigint;
   group: OnchainGroup;
   name: string;
@@ -325,6 +357,9 @@ function GroupHeader({ id, group, name, imageUrl, isCreator, canEdit, onEdit, on
   canEdit: boolean;
   onEdit: () => void;
   onBack: () => void;
+  canShowMembers: boolean;
+  membersOpen: boolean;
+  onToggleMembers: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const url = siteUrl(`/g/${id.toString()}`);
@@ -351,11 +386,24 @@ function GroupHeader({ id, group, name, imageUrl, isCreator, canEdit, onEdit, on
       <GroupAvatar src={imageUrl} seed={id.toString()} name={name} size={40} />
       <div className="flex-1 min-w-0">
         <div className="font-semibold truncate">{name}</div>
-        <div className="text-xs text-text-secondary truncate">
-          {group.memberCount.toString()}
-          {group.capacity > 0n ? ` / ${group.capacity.toString()}` : ''} members
-          {isCreator ? ' · you created this' : ''}
-        </div>
+        {canShowMembers ? (
+          <button
+            onClick={onToggleMembers}
+            className="text-xs text-text-secondary hover:text-text-primary truncate inline-flex items-center gap-1"
+            title={membersOpen ? 'Hide members' : 'Show members'}
+          >
+            {group.memberCount.toString()}
+            {group.capacity > 0n ? ` / ${group.capacity.toString()}` : ''} members
+            {isCreator ? ' · you created this' : ''}
+            <ChevronDown size={12} className={membersOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
+          </button>
+        ) : (
+          <div className="text-xs text-text-secondary truncate">
+            {group.memberCount.toString()}
+            {group.capacity > 0n ? ` / ${group.capacity.toString()}` : ''} members
+            {isCreator ? ' · you created this' : ''}
+          </div>
+        )}
       </div>
       {canEdit && (
         <button
