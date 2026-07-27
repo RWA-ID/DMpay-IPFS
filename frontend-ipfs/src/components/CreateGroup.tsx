@@ -6,9 +6,10 @@ import { parseUnits, parseEther, decodeEventLog } from 'viem';
 import { ArrowLeft, Users, Loader2, CheckCircle2, AlertCircle, Sparkles, Copy, Image as ImageIcon } from 'lucide-react';
 import { DMPAY_DIRECT_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 import { useXmtpClient } from '../hooks/useXmtpClient';
-import { siteUrl } from '../lib/site';
+import { groupUrl } from '../lib/site';
 import { uploadPublicToPinata } from '../lib/pinata';
 import { GroupAvatar } from './GroupAvatar';
+import { ShareGroup } from './ShareGroup';
 
 export function CreateGroup() {
   const navigate = useNavigate();
@@ -132,7 +133,7 @@ export function CreateGroup() {
   const xmtpDone = !!xmtpGroupId;
   const linkDone = linkReceipt.isSuccess;
   const allDone = onChainDone && xmtpDone && linkDone;
-  const shareUrl = groupId !== null ? siteUrl(`/g/${groupId.toString()}`) : '';
+  const shareUrl = groupId !== null ? groupUrl(groupId, name) : '';
 
   if (!isConnected) {
     return (
@@ -170,6 +171,15 @@ export function CreateGroup() {
               >
                 <Copy size={14} />
               </button>
+            </div>
+
+            <div className="mt-4 flex justify-center">
+              <ShareGroup
+                id={groupId!}
+                name={name}
+                price={usdc ? `$${usdc}` : eth ? `${eth} ETH` : null}
+                variant="pill"
+              />
             </div>
 
             <div className="mt-6 grid grid-cols-2 gap-3 text-left">

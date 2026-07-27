@@ -28,3 +28,30 @@ export function siteLabel(path: string): string {
 
 export const profileUrl = (idOrEns: string) => siteUrl(`/u/${idOrEns}`);
 export const profileLabel = (idOrEns: string) => siteLabel(`/u/${idOrEns}`);
+
+/**
+ * URL-safe form of a group name, appended to the id purely so a shared link
+ * describes itself: /g/0-alpha-leaks-chat. The router reads the leading id and
+ * ignores the rest, so the slug can change (or be absent) without breaking an
+ * already-shared link.
+ *
+ * It is decoration, never a source of truth — anyone can craft any slug for
+ * any id, so nothing in the app should display it as the group's real name.
+ */
+export function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48)
+    .replace(/-+$/, '');
+}
+
+export function groupPath(id: bigint | string, name?: string | null): string {
+  const slug = name ? slugify(name) : '';
+  return `/g/${id.toString()}${slug ? `-${slug}` : ''}`;
+}
+
+export const groupUrl = (id: bigint | string, name?: string | null) => siteUrl(groupPath(id, name));
+export const groupLabel = (id: bigint | string, name?: string | null) => siteLabel(groupPath(id, name));

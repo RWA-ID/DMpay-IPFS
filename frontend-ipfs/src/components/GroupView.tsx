@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAccount, useReadContract } from 'wagmi';
+import { useAccount, useReadContract, useEnsName } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
-import { ArrowLeft, Users, Loader2, AlertCircle, Clock, Copy, Check, Pencil, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Users, Loader2, AlertCircle, Clock, Pencil, ChevronDown } from 'lucide-react';
 import type { Group } from '@xmtp/browser-sdk';
 import { DMPAY_DIRECT_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
 import {
@@ -12,7 +12,8 @@ import { ethIdentifier } from '../lib/xmtp';
 import { useXmtpClient } from '../hooks/useXmtpClient';
 import { XmtpChat } from './XmtpChat';
 import { GroupPaywall } from './GroupPaywall';
-import { siteUrl } from '../lib/site';
+import { formatEther, formatUnits } from 'viem';
+import { ShareGroup } from './ShareGroup';
 import { GroupAvatar } from './GroupAvatar';
 import { GroupSettings } from './GroupSettings';
 import { GroupMembers } from './GroupMembers';
@@ -78,19 +79,11 @@ export function GroupView() {
     return <Notice title="Group not found" body={`No group with id ${id.toString()} exists on the DMpay contract.`} onBack={() => navigate('/inbox')} />;
   }
 
+  // A shared link usually lands on a disconnected visitor. Show them what
+  // they've been invited to rather than a bare connect button that duplicates
+  // the one already in the top bar.
   if (!isConnected) {
-    return (
-      <Centered>
-        <Users className="text-brand mb-4" size={28} />
-        <div className="text-text-primary font-medium mb-1">Connect to view this group</div>
-        <div className="text-text-secondary text-sm mb-6 max-w-xs">
-          DMpay needs your wallet to check membership and route messages over XMTP.
-        </div>
-        <button onClick={() => openConnectModal?.()} className="bg-brand hover:bg-brand-hover text-brand-ink rounded-2xl px-6 py-3 font-medium">
-          Connect wallet
-        </button>
-      </Centered>
-    );
+    return <GroupPreview id={id} group={group} onConnect={() => openConnectModal?.()} />;
   }
 
   if (!group.active) {
@@ -106,6 +99,7 @@ export function GroupView() {
         group={group}
         name={groupName}
         imageUrl={meta.imageUrl}
+        meta={meta}
         isCreator={isCreator}
         canEdit={isCreator && !!convo}
         onEdit={() => setSettingsOpen(true)}
@@ -348,10 +342,12 @@ function GroupChat({ id, group, groupName, isCreator, client, onMeta, onConvo, s
   );
 }
 
-function GroupHeader({ id, group, name, imageUrl, isCreator, canEdit, onEdit, onBack, canShowMembers, membersOpen, onToggleMembers }: {
+function GroupHeader({ id, group, name, meta, imageUrl, isCreator, canEdit, onEdit, onBack, canShowMembers, membersOpen, onToggleMembers }: {
   id: bigint;
   group: OnchainGroup;
   name: string;
+  /** Real name when the viewer is a member — drives the link slug. */
+  meta: GroupMeta;
   imageUrl: string | null;
   isCreator: boolean;
   canEdit: boolean;
@@ -361,19 +357,6 @@ function GroupHeader({ id, group, name, imageUrl, isCreator, canEdit, onEdit, on
   membersOpen: boolean;
   onToggleMembers: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
-  const url = siteUrl(`/g/${id.toString()}`);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      window.prompt('Copy group link', url);
-    }
-  }
-
   return (
     <header className="flex items-center gap-3 p-4 border-b border-border-subtle">
       <button
@@ -414,13 +397,7 @@ function GroupHeader({ id, group, name, imageUrl, isCreator, canEdit, onEdit, on
           <Pencil size={11} /> Edit
         </button>
       )}
-      <button
-        onClick={copy}
-        className="font-mono text-[11px] text-text-secondary hover:text-text-primary border border-border-subtle rounded-full px-3 py-1.5 inline-flex items-center gap-1.5 shrink-0"
-        title="Copy invite link"
-      >
-        {copied ? <Check size={11} /> : <Copy size={11} />} {copied ? 'Copied' : 'Invite'}
-      </button>
+      <ShareGroup id={id} name={meta.name} price={priceLabel(group)} variant="pill" />
     </header>
   );
 }
@@ -442,7 +419,90 @@ function Centered({ children }: { children: React.ReactNode }) {
   return <main className="flex-1 flex flex-col items-center justify-center bg-bg-base text-center p-6">{children}</main>;
 }
 
+/**
+ * What a shared group link shows before the visitor connects: the terms they're
+ * being offered, from chain state alone. The name and image can't appear here —
+ * they live in the encrypted XMTP group and only members can read them.
+ */
+function GroupPreview({ id, group, onConnect }: {
+  id: bigint;
+  group: OnchainGroup;
+  onConnect: () => void;
+}) {
+  const { data: creatorEns } = useEnsName({ address: group.creator });
+  const creatorLabel = creatorEns ?? `${group.creator.slice(0, 6)}…${group.creator.slice(-4)}`;
+  const full = group.capacity > 0n && group.memberCount >= group.capacity;
+  const price = priceLabel(group);
+
+  return (
+    <main className="flex-1 overflow-y-auto bg-bg-base">
+      <div className="max-w-lg mx-auto px-6 py-12">
+        <div className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-text-muted mb-4">
+          · You've been invited to a paid group
+        </div>
+
+        <div className="bg-bg-panel border border-border-subtle rounded-3xl p-7">
+          <div className="flex items-start gap-4">
+            <GroupAvatar src={null} seed={id.toString()} name={null} size={56} />
+            <div className="min-w-0 flex-1">
+              <h1 className="dm-display text-3xl text-text-primary leading-tight">Group #{id.toString()}</h1>
+              <div className="font-mono text-[12px] text-text-muted mt-1.5 truncate">by {creatorLabel}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mt-7">
+            <div className="bg-bg-elevated rounded-2xl p-4">
+              <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">Per seat</div>
+              <div className="dm-display font-mono text-2xl text-text-primary mt-1.5">{price ?? 'Free'}</div>
+            </div>
+            <div className="bg-bg-elevated rounded-2xl p-4">
+              <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">Members</div>
+              <div className="dm-display font-mono text-2xl text-text-primary mt-1.5">
+                {group.memberCount.toString()}
+                {group.capacity > 0n && (
+                  <span className="text-text-muted text-base"> / {group.capacity.toString()}</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={onConnect}
+            disabled={full}
+            className="w-full mt-5 bg-brand hover:bg-brand-hover disabled:bg-bg-elevated disabled:text-text-muted text-brand-ink rounded-2xl py-4 font-medium"
+          >
+            {full ? 'This group is full' : 'Connect wallet to join'}
+          </button>
+
+          <div className="text-[11px] text-text-muted mt-4 leading-relaxed">
+            Pay once for a seat — 97.5% settles directly to the creator, 2.5% protocol fee, no custody.
+            The conversation is an end-to-end encrypted XMTP group, so its name and image are only
+            readable once you're a member.
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <ShareGroup id={id} price={price} />
+        </div>
+      </div>
+    </main>
+  );
+}
+
+/** Seat price in the currency the creator actually priced in, for share copy. */
+function priceLabel(group: OnchainGroup): string | null {
+  if (group.priceUsdc > 0n) return `$${formatUnits(group.priceUsdc, 6)}`;
+  if (group.priceEth > 0n) return `${formatEther(group.priceEth)} ETH`;
+  return null;
+}
+
+/**
+ * Accepts a bare id ("0") or an id with a descriptive slug ("0-alpha-leaks-chat").
+ * The slug exists only to make a shared link self-describing; it is ignored
+ * here, so renaming a group never invalidates a link already in the wild.
+ */
 function parseGroupId(raw: string | undefined): bigint | null {
-  if (!raw || !/^\d+$/.test(raw)) return null;
-  try { return BigInt(raw); } catch { return null; }
+  const match = raw?.match(/^(\d+)(?:-.*)?$/);
+  if (!match) return null;
+  try { return BigInt(match[1]); } catch { return null; }
 }

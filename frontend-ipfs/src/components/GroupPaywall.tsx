@@ -4,6 +4,7 @@ import { formatEther, formatUnits } from 'viem';
 import { Users, Loader2, AlertCircle, Sparkles } from 'lucide-react';
 import { DMPAY_DIRECT_ADDRESS, USDC_ADDRESS, dmpayDirectAbi, erc20Abi } from '../lib/contracts';
 import type { OnchainGroup } from '../lib/groups';
+import { ShareGroup } from './ShareGroup';
 
 type Tier = 'usdc' | 'eth';
 
@@ -68,6 +69,16 @@ export function GroupPaywall({
               {group.capacity > 0n ? ` / ${group.capacity.toString()}` : ''}
             </span>
           </div>
+        </div>
+
+        {/* Anyone can pass the group on, member or not. */}
+        <div className="mb-6">
+          <ShareGroup
+            id={id}
+            price={group.priceUsdc > 0n
+              ? `$${formatUnits(group.priceUsdc, 6)}`
+              : group.priceEth > 0n ? `${formatEther(group.priceEth)} ETH` : null}
+          />
         </div>
 
         {free ? (

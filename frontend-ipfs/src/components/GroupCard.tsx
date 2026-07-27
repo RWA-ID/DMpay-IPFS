@@ -4,6 +4,7 @@ import { formatEther, formatUnits } from 'viem';
 import { ArrowRight, Loader2, Users } from 'lucide-react';
 import { GroupAvatar } from './GroupAvatar';
 import { hasXmtpId, xmtpIdKey, type PublicGroup } from '../lib/groups';
+import { groupPath } from '../lib/site';
 import type { GroupMetaMap } from '../hooks/useGroups';
 
 /**
@@ -31,7 +32,7 @@ export function GroupCard({ group, meta, showCreator = true }: {
 
   return (
     <button
-      onClick={() => navigate(`/g/${group.id.toString()}`)}
+      onClick={() => navigate(groupPath(group.id, known?.name))}
       className="bg-bg-panel border border-border-subtle rounded-2xl p-5 text-left hover:bg-bg-elevated transition-colors flex flex-col gap-4 min-h-[200px]"
     >
       <div className="flex items-start gap-3">
