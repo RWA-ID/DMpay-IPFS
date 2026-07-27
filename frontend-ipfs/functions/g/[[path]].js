@@ -103,11 +103,17 @@ async function buildCard(id) {
     ? `${published.name} — a paid group by ${byline}`
     : `Group #${id} by ${byline} — DMpay`;
 
+  // Creators upload whatever shape they like, so the card format follows the
+  // image rather than assuming it's a square avatar: a wide image center-
+  // cropped into `summary` loses its sides, a square one stretched into
+  // `summary_large_image` loses its top and bottom.
+  const aspect = published?.image ? await imageAspect(published.image).catch(() => null) : null;
+
   const description = active
     ? `${price} for a seat · ${seats}. Pay once to join an end-to-end encrypted group chat on XMTP, settled on Ethereum. 97.5% goes to the creator.`
     : `This group is closed. ${seats}.`;
 
-  return { title, description, image: published?.image ?? null, url };
+  return { title, description, image: published?.image ?? null, aspect, url };
 }
 
 /** Mirrors src/lib/groupMeta.ts — the creator's public copy of the group identity. */
@@ -123,6 +129,49 @@ async function publishedMeta(verifiedName, id) {
       ? parsed.image.trim().slice(0, 500)
       : null,
   };
+}
+
+/** Within 15% of 1:1 — tolerant enough for a 1000x1024 avatar. */
+function isSquarish(aspect) {
+  return aspect !== null && aspect !== undefined && aspect > 0.87 && aspect < 1.15;
+}
+
+/**
+ * Width/height of a remote image, read from the file header via a ranged
+ * request so a multi-megabyte avatar isn't downloaded just to measure it.
+ * Returns null for anything unrecognised, which falls back to the large card.
+ */
+async function imageAspect(url) {
+  // 16KB: PNG/GIF need only the first few dozen bytes, but a JPEG from a
+  // phone can carry a large EXIF thumbnail ahead of its frame header.
+  const res = await fetch(url, { headers: { range: 'bytes=0-16383' } });
+  if (!res.ok && res.status !== 206) return null;
+  const b = new Uint8Array(await res.arrayBuffer());
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+
+  // PNG: 8-byte signature, then IHDR with width/height as big-endian uint32.
+  if (b.length > 24 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) {
+    return dv.getUint32(16) / dv.getUint32(20);
+  }
+  // GIF: dimensions are little-endian uint16 right after the header.
+  if (b.length > 10 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) {
+    return dv.getUint16(6, true) / dv.getUint16(8, true);
+  }
+  // JPEG: walk the marker chain to the start-of-frame, which carries the size.
+  if (b.length > 4 && b[0] === 0xff && b[1] === 0xd8) {
+    let i = 2;
+    while (i + 9 < b.length) {
+      if (b[i] !== 0xff) { i++; continue; }
+      const marker = b[i + 1];
+      // SOF0-3, SOF5-7, SOF9-11, SOF13-15 — every non-differential frame type.
+      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) {
+        return dv.getUint16(i + 7, false) / dv.getUint16(i + 5, false);
+      }
+      i += 2 + dv.getUint16(i + 2, false);
+    }
+    return null;
+  }
+  return null;
 }
 
 /**
@@ -173,7 +222,7 @@ class MetaRewriter {
   element(el) {
     const key = el.getAttribute('property') ?? el.getAttribute('name');
     if (!key) return;
-    const { title, description, image, url } = this.card;
+    const { title, description, aspect, url } = this.card;
 
     switch (key) {
       case 'og:title':
@@ -195,9 +244,9 @@ class MetaRewriter {
         el.setAttribute('content', description);
         break;
       case 'twitter:card':
-        // A group image is a square avatar; the large-image card crops it
-        // badly, so only claim that format when there is no group image.
-        el.setAttribute('content', image ? 'summary' : 'summary_large_image');
+        // `summary` is only right for a roughly square image; anything wider
+        // (and the no-image default) reads better as the large card.
+        el.setAttribute('content', isSquarish(aspect) ? 'summary' : 'summary_large_image');
         break;
     }
   }
