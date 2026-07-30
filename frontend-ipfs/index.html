@@ -10,18 +10,37 @@
     <link rel="canonical" href="%VITE_PUBLIC_URL%" />
     <meta name="google-site-verification" content="3pBbsK-H3SHiH653tf17ZEnCC30C-ELeT0OkLcY6Jyg" />
 
-    <!-- Open Graph -->
+    <!-- Open Graph
+         These are the tags every crawler sees, since the app is client-rendered
+         and a crawler never runs the JS that fills the page in. Routes that can
+         describe themselves better — /u/, /c/, /g/ — have their meta rewritten
+         per request by the Pages functions in functions/; this is the floor
+         under all of them, and the only card the IPFS build can offer. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="DMpay" />
     <meta property="og:title" content="DMpay — Your inbox is worth more than zero." />
     <meta property="og:description" content="Pay-to-DM on Ethereum. Set a price in USDC or ETH, fans pay to message you or buy a lifetime pass. 97.5% settles directly to your wallet — no platform cut." />
     <meta property="og:url" content="%VITE_PUBLIC_URL%" />
+    <!-- Absolute and pointed at the share host in both builds: og:image must be
+         a fully-qualified URL, and links handed to other people already resolve
+         to app.dmpay.me (see src/lib/site.ts), so the card image should come
+         from the same place rather than from whichever IPFS gateway served the
+         page. og.png ships in both builds regardless. -->
+    <meta property="og:image" content="%VITE_SHARE_URL%/og.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="DMpay — your inbox is worth more than zero. Set a price in USDC or ETH; 97.5% settles straight to your wallet." />
 
     <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="DMpay — Your inbox is worth more than zero." />
     <meta name="twitter:description" content="Pay-to-DM on Ethereum. Set a price in USDC or ETH. 97.5% to your wallet, on-chain." />
     <meta name="twitter:site" content="@dmpayeth" />
+    <!-- Stated explicitly rather than left to fall back to og:image — some
+         clients don't do that fallback. -->
+    <meta name="twitter:image" content="%VITE_SHARE_URL%/og.png" />
+    <meta name="twitter:image:alt" content="DMpay — your inbox is worth more than zero. Set a price in USDC or ETH; 97.5% settles straight to your wallet." />
   </head>
   <body>
     <div id="root"></div>

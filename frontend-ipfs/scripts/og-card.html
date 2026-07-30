@@ -1,0 +1,197 @@
+<!doctype html>
+<!--
+  Source for public/og.png — the default share card behind every link that has
+  no image of its own. Kept here so the card can be re-rendered when the copy
+  or the brand moves, rather than existing only as a binary.
+
+  Render (needs Geist locally, else it falls back to a system face):
+
+    curl -s "https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" -o geist.css
+    # download each font URL in geist.css and point the CSS at the local copies
+    CH=~/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-x64/chrome-headless-shell
+    "$CH" --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=2 \
+          --window-size=1200,630 --screenshot=og@2x.png --virtual-time-budget=4000 \
+          --allow-file-access-from-files og-card.html
+    sips -z 630 1200 og@2x.png --out ../public/og.png
+
+  Rendering at 2x and downscaling is what keeps the type crisp. Platforms cache
+  share cards hard, so re-scrape in X's post composer after replacing the file.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="geist.local.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; }
+  body {
+    background: #0B0B0A;
+    color: #F2F0E8;
+    font-family: 'Geist', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Faint paper glow, top-left — keeps the flat black from reading as empty. */
+  .glow {
+    position: absolute; top: -280px; left: -200px;
+    width: 900px; height: 900px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(242,240,232,0.055) 0%, rgba(242,240,232,0) 62%);
+  }
+  /* Hairline grid, barely there. */
+  .grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(to right, rgba(242,240,232,0.028) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(242,240,232,0.028) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse 90% 80% at 30% 40%, #000 30%, transparent 78%);
+  }
+
+  .frame {
+    position: relative;
+    height: 100%;
+    padding: 62px 72px 54px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .top { display: flex; align-items: center; gap: 14px; }
+  .mark { width: 44px; height: 44px; display: block; }
+  .wordmark {
+    font-size: 27px; font-weight: 600; letter-spacing: -0.035em;
+  }
+  .eyebrow {
+    margin-left: auto;
+    font-family: 'Geist Mono', monospace;
+    font-size: 14px; font-weight: 500;
+    letter-spacing: 0.17em; text-transform: uppercase;
+    color: #8B8A82;
+  }
+
+  .body { flex: 1; display: flex; align-items: center; gap: 64px; margin-top: 4px; }
+
+  h1 {
+    font-weight: 500;
+    font-size: 76px;
+    line-height: 0.98;
+    letter-spacing: -0.042em;
+    max-width: 620px;
+  }
+  h1 .dim { color: #8B8A82; }
+  .sub {
+    margin-top: 30px;
+    font-size: 23px;
+    line-height: 1.42;
+    color: #D5D3CB;
+    letter-spacing: -0.012em;
+    max-width: 560px;
+  }
+  .sub b { color: #F2F0E8; font-weight: 500; }
+
+  /* Right: a miniature of the thing itself — a DM with a price on it. */
+  .panel {
+    width: 372px; flex: none;
+    background: #161513;
+    border: 1px solid #25241F;
+    border-radius: 26px;
+    padding: 26px 26px 24px;
+    box-shadow: 0 24px 64px -20px rgba(0,0,0,0.85);
+  }
+  .who { display: flex; align-items: center; gap: 13px; }
+  .avatar {
+    width: 46px; height: 46px; border-radius: 50%;
+    background: linear-gradient(145deg, #F2F0E8 0%, #A9A69A 100%);
+    color: #0B0B0A; font-size: 21px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    letter-spacing: -0.03em;
+  }
+  .who .name { font-size: 19px; font-weight: 500; letter-spacing: -0.02em; }
+  .who .addr {
+    font-family: 'Geist Mono', monospace;
+    font-size: 12.5px; color: #8B8A82; margin-top: 3px;
+  }
+  .price-row {
+    margin-top: 22px; padding-top: 20px; border-top: 1px solid #25241F;
+    display: flex; align-items: baseline; justify-content: space-between;
+  }
+  .price-label {
+    font-family: 'Geist Mono', monospace;
+    font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #8B8A82;
+  }
+  .price { font-size: 34px; font-weight: 500; letter-spacing: -0.035em; }
+  .price .unit { font-size: 16px; color: #8B8A82; margin-left: 6px; letter-spacing: 0; }
+  .bubble {
+    margin-top: 20px;
+    background: #1F1E1A;
+    border-radius: 20px 20px 20px 6px;
+    padding: 14px 17px;
+    font-size: 16.5px; color: #D5D3CB; line-height: 1.35;
+  }
+  .cta {
+    margin-top: 16px;
+    background: #F2F0E8; color: #0B0B0A;
+    border-radius: 999px; padding: 13px 0; text-align: center;
+    font-size: 16.5px; font-weight: 500; letter-spacing: -0.015em;
+  }
+
+  .foot {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-top: 26px; border-top: 1px solid #25241F;
+    font-family: 'Geist Mono', monospace;
+    font-size: 15px; letter-spacing: 0.05em; color: #8B8A82;
+  }
+  .foot .host { color: #F2F0E8; letter-spacing: 0.02em; }
+  .dot { color: #322F28; margin: 0 10px; }
+</style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="grid"></div>
+
+  <div class="frame">
+    <div class="top">
+      <svg class="mark" viewBox="0 0 24 24">
+        <rect width="24" height="24" rx="6" fill="#F2F0E8"/>
+        <path d="M5 7h10a5 5 0 0 1 0 10H9l-4 2.5V7z" fill="#0B0B0A"/>
+        <circle cx="13" cy="12" r="1.2" fill="#F2F0E8"/>
+      </svg>
+      <div class="wordmark">DMpay</div>
+      <div class="eyebrow">Pay-to-DM · Ethereum</div>
+    </div>
+
+    <div class="body">
+      <div>
+        <h1>Your inbox is<br>worth more<br>than <span class="dim">zero.</span></h1>
+        <div class="sub">
+          Set a price in USDC or ETH. Strangers pay to reach you —
+          <b>97.5% settles straight to your wallet</b>, on-chain, no platform cut.
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="who">
+          <div class="avatar">Y</div>
+          <div>
+            <div class="name">you.eth</div>
+            <div class="addr">0x71C7…F3b2</div>
+          </div>
+        </div>
+        <div class="price-row">
+          <div class="price-label">Price to DM</div>
+          <div class="price">25.00<span class="unit">USDC</span></div>
+        </div>
+        <div class="bubble">Got a pitch that's worth your time.</div>
+        <div class="cta">Pay &amp; send</div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <div class="host">app.dmpay.me</div>
+      <div><span>XMTP encrypted</span><span class="dot">/</span><span>USDC + ETH</span><span class="dot">/</span><span>Mainnet</span></div>
+    </div>
+  </div>
+</body>
+</html>
