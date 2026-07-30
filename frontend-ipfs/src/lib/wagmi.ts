@@ -12,5 +12,15 @@ export const config = getDefaultConfig({
   transports: {
     [mainnet.id]: http('https://ethereum-rpc.publicnode.com'),
   },
+  // Collapse concurrent eth_calls into one Multicall3 aggregate3. The list views
+  // fan out per row — a price read, a name, an avatar, a registrar expiry — and
+  // each was its own round-trip against a public RPC.
+  //
+  // Safe for CCIP-Read: a batched call that reverts comes back through
+  // aggregate3's allowFailure, is rethrown as a RawContractError carrying the
+  // raw revert data, and viem's `call` still matches the OffchainLookup
+  // signature against the per-request `to` — so offchain/wildcard resolvers keep
+  // working. Verified in viem's actions/public/call.js before enabling.
+  batch: { multicall: true },
   ssr: false,
 });

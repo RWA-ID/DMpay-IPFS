@@ -1,5 +1,6 @@
 import { normalize } from 'viem/ens';
 import { logsClient } from './logs';
+import { isEnsNameOwned } from './ensExpiry';
 
 /**
  * Public, third-party-readable group identity.
@@ -50,6 +51,10 @@ export function decodeGroupMeta(raw: string | null | undefined): PublicGroupMeta
  * it unverified would let someone publish group metadata "from" a name they
  * don't own, so the name is forward-resolved back to the address first — the
  * standard ENS forward/reverse round-trip.
+ *
+ * The round-trip only proves the two records agree, though, and lapsed records
+ * agree with each other just fine — so the registrar is asked whether the name
+ * is still registered at all. See lib/ensExpiry.ts.
  */
 export async function verifiedEnsName(address: `0x${string}`): Promise<string | null> {
   try {
@@ -59,6 +64,7 @@ export async function verifiedEnsName(address: `0x${string}`): Promise<string | 
     if (!normalized) return null;
     const forward = await logsClient.getEnsAddress({ name: normalized });
     if (!forward || forward.toLowerCase() !== address.toLowerCase()) return null;
+    if (!(await isEnsNameOwned(normalized))) return null;
     return normalized;
   } catch {
     return null;

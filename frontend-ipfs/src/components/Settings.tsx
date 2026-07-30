@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useAccount, useEnsName, useEnsAvatar, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useEnsAvatar, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useVerifiedEnsName } from '../hooks/useVerifiedEnsName';
+import { expiryDate } from '../lib/ensExpiry';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { normalize } from 'viem/ens';
 import { parseUnits, parseEther, formatUnits, formatEther } from 'viem';
@@ -12,7 +14,7 @@ export function Settings() {
   const navigate = useNavigate();
   const { address, isConnected } = useAccount();
   const { openConnectModal } = useConnectModal();
-  const { data: ensName } = useEnsName({ address });
+  const { data: ensName, status: nameStatus, expiry: nameExpiry, unverifiedName } = useVerifiedEnsName({ address });
   const normalized = ensName ? safeNormalize(ensName) : undefined;
   const { data: avatar } = useEnsAvatar({ name: normalized, query: { enabled: !!normalized } });
 
@@ -94,6 +96,22 @@ export function Settings() {
             <div className="text-xs text-text-muted font-mono mt-1 break-all">{address}</div>
           </div>
         </div>
+
+        {(nameStatus === 'expired' || nameStatus === 'grace') && unverifiedName && (
+          <div className="bg-amber-500/5 border border-amber-500/30 rounded-2xl p-4 mb-8 flex gap-3">
+            <AlertCircle size={16} className="text-amber-400 shrink-0 mt-0.5" />
+            <div className="text-sm text-text-secondary">
+              <div className="text-text-primary font-medium mb-1">
+                {nameStatus === 'expired'
+                  ? `${unverifiedName} has expired`
+                  : `${unverifiedName} is past its renewal date`}
+              </div>
+              {nameStatus === 'expired'
+                ? `Your primary name lapsed on ${expiryDate(nameExpiry)} and its grace period has ended, so it is open for anyone to register. DMpay now shows your address instead, and your groups have stopped publishing their public identity. Renewing is no longer possible — you would have to register the name again.`
+                : `Your primary name expired on ${expiryDate(nameExpiry)}. Only you can renew it, but once the 90-day grace period ends anyone can take it. Renew at app.ens.domains to keep it.`}
+            </div>
+          </div>
+        )}
 
         <div className="bg-bg-panel border border-border-subtle rounded-3xl p-6 sm:p-8 space-y-6">
           <div>

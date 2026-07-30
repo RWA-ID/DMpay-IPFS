@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useEnsName } from 'wagmi';
+import { useVerifiedEnsName } from '../hooks/useVerifiedEnsName';
 import { ArrowRight, Loader2, Users } from 'lucide-react';
 import { GroupAvatar } from './GroupAvatar';
 import { hasXmtpId, xmtpIdKey, seatPriceLabel, type PublicGroup } from '../lib/groups';
@@ -18,7 +18,7 @@ export function GroupCard({ group, meta, publicMeta, showCreator = true }: {
   showCreator?: boolean;
 }) {
   const navigate = useNavigate();
-  const { data: ensName } = useEnsName({ address: group.creator, query: { enabled: showCreator } });
+  const { data: ensName } = useVerifiedEnsName({ address: group.creator, query: { enabled: showCreator } });
 
   // Membership beats publication: the XMTP metadata is what the group actually
   // is, the ENS record is the creator's public copy of it, which can lag.

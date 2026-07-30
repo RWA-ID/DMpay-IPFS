@@ -1,12 +1,13 @@
 import { MessageSquare, Plus, Compass, Settings, HelpCircle, User, Users } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAccount, useEnsName } from 'wagmi';
+import { useAccount } from 'wagmi';
+import { useVerifiedEnsName } from '../hooks/useVerifiedEnsName';
 
 export function Sidebar() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { address } = useAccount();
-  const { data: ensName } = useEnsName({ address });
+  const { data: ensName } = useVerifiedEnsName({ address });
 
   const isInbox = pathname === '/inbox' || pathname.startsWith('/c/');
   const isDiscover = pathname === '/discover';

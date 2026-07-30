@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useEnsName, useEnsAvatar, useEnsText, useReadContract } from 'wagmi';
+import { useEnsAvatar, useEnsText, useReadContract } from 'wagmi';
+import { useVerifiedEnsName } from '../hooks/useVerifiedEnsName';
 import { normalize } from 'viem/ens';
 import { parseAbiItem, formatUnits, formatEther } from 'viem';
 import { Globe, AtSign, Code2, Settings as SettingsIcon, MessageCircle, Infinity as InfinityIcon, ShieldCheck, ExternalLink, Loader2, BadgePlus, Pencil, X, Users, Plus } from 'lucide-react';
@@ -25,7 +26,7 @@ type SupporterRow = {
 export function OwnerProfile({ address }: { address: `0x${string}` }) {
   const navigate = useNavigate();
 
-  const { data: ensName, refetch: refetchEnsName } = useEnsName({ address });
+  const { data: ensName, refetch: refetchEnsName } = useVerifiedEnsName({ address });
   const normalized = ensName ? safeNormalize(ensName) : undefined;
   const { data: avatar, refetch: refetchAvatar } = useEnsAvatar({ name: normalized, query: { enabled: !!normalized } });
   const [panel, setPanel] = useState<'none' | 'register' | 'records'>('none');
@@ -391,7 +392,7 @@ function Stat({ label, value, loading }: { label: string; value: string; loading
 }
 
 function SupporterRow({ row }: { row: SupporterRow }) {
-  const { data: ensName } = useEnsName({ address: row.sender });
+  const { data: ensName } = useVerifiedEnsName({ address: row.sender });
   const { data: avatar } = useEnsAvatar({ name: ensName ? safeNormalize(ensName) : undefined, query: { enabled: !!ensName } });
   const display = ensName ?? `${row.sender.slice(0, 6)}…${row.sender.slice(-4)}`;
   const isUSDC = row.token.toLowerCase() === USDC_ADDRESS.toLowerCase();

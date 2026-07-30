@@ -1,4 +1,5 @@
-import { useEnsName, useEnsAvatar } from 'wagmi';
+import { useEnsAvatar } from 'wagmi';
+import { useVerifiedEnsName } from '../hooks/useVerifiedEnsName';
 import { normalize } from 'viem/ens';
 import { Loader2, Crown, Clock } from 'lucide-react';
 import { Avatar } from './Avatar';
@@ -65,7 +66,7 @@ function MemberRow({ member, isCreator, isMe }: {
   isCreator: boolean;
   isMe: boolean;
 }) {
-  const { data: ensName } = useEnsName({
+  const { data: ensName } = useVerifiedEnsName({
     address: member.address ?? undefined,
     query: { enabled: !!member.address },
   });

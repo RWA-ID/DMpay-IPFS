@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useEnsName, useEnsAvatar, useEnsText } from 'wagmi';
+import { useEnsAvatar, useEnsText } from 'wagmi';
+import { useVerifiedEnsName } from '../hooks/useVerifiedEnsName';
 import { parseAbiItem, formatUnits, formatEther } from 'viem';
 import { normalize } from 'viem/ens';
 import { ArrowRight, Loader2, Search, Users } from 'lucide-react';
@@ -162,7 +163,7 @@ export function Discover() {
 
 function CreatorCard({ c }: { c: Creator }) {
   const navigate = useNavigate();
-  const { data: ensName } = useEnsName({ address: c.address });
+  const { data: ensName } = useVerifiedEnsName({ address: c.address });
   const normalized = ensName ? safeNormalize(ensName) : undefined;
   const { data: avatar } = useEnsAvatar({ name: normalized, query: { enabled: !!normalized } });
   const { data: description } = useEnsText({ name: normalized, key: 'description', query: { enabled: !!normalized } });

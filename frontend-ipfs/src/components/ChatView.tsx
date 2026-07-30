@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAccount, useEnsName, useEnsAvatar, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useEnsAvatar, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useVerifiedEnsName } from '../hooks/useVerifiedEnsName';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { normalize } from 'viem/ens';
 import { MoreHorizontal, MessageSquare, User, Ban, Copy, ExternalLink, ArrowLeft, XCircle, Loader2 } from 'lucide-react';
@@ -49,7 +50,7 @@ export function ChatView() {
     return () => { cancelled = true; };
   }, [client, address]);
 
-  const { data: ensName } = useEnsName({ address });
+  const { data: ensName } = useVerifiedEnsName({ address });
   const normalized = ensName ? safeNormalize(ensName) : undefined;
   const { data: avatar } = useEnsAvatar({ name: normalized, query: { enabled: !!normalized } });
 

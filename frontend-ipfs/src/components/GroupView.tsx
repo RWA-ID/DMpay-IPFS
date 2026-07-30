@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAccount, useReadContract, useEnsName } from 'wagmi';
+import { useAccount, useReadContract } from 'wagmi';
+import { useVerifiedEnsName } from '../hooks/useVerifiedEnsName';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { ArrowLeft, Users, Loader2, AlertCircle, Clock, Pencil, ChevronDown } from 'lucide-react';
 import type { Group } from '@xmtp/browser-sdk';
@@ -442,7 +443,7 @@ function GroupPreview({ id, group, published, onConnect }: {
   published: PublicGroupMeta | null;
   onConnect: () => void;
 }) {
-  const { data: creatorEns } = useEnsName({ address: group.creator });
+  const { data: creatorEns } = useVerifiedEnsName({ address: group.creator });
   const creatorLabel = creatorEns ?? `${group.creator.slice(0, 6)}…${group.creator.slice(-4)}`;
   const full = group.capacity > 0n && group.memberCount >= group.capacity;
   const price = seatPriceLabel(group);

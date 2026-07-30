@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useDisconnect, useEnsName, useEnsAvatar } from 'wagmi';
+import { useDisconnect, useEnsAvatar } from 'wagmi';
+import { useVerifiedEnsName } from '../hooks/useVerifiedEnsName';
 import { useNavigate } from 'react-router-dom';
 import { normalize } from 'viem/ens';
 import { ChevronDown, Copy, Check, LogOut, User, Wallet } from 'lucide-react';
@@ -73,7 +74,7 @@ function AccountChip({
   onViewProfile: (ensName: string | null) => void;
   onDisconnect: () => void;
 }) {
-  const { data: ensName } = useEnsName({ address });
+  const { data: ensName } = useVerifiedEnsName({ address });
   const { data: avatar } = useEnsAvatar({ name: ensName ? safeNormalize(ensName) : undefined, query: { enabled: !!ensName } });
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useEnsName, useEnsAvatar } from 'wagmi';
+import { useEnsAvatar } from 'wagmi';
+import { useVerifiedEnsName } from '../hooks/useVerifiedEnsName';
 import { normalize } from 'viem/ens';
 import { isAddress } from 'viem';
 import { Loader2, MessageSquare, Inbox as InboxIcon, Zap, RefreshCw, Search, Users } from 'lucide-react';
@@ -240,7 +241,7 @@ function formatWhen(msg: DecodedMessage<unknown> | null): string {
 
 function InboxRow({ row, onOpen }: { row: DmRow; onOpen: (addr: string) => void }) {
   const peer = row.peerAddress as `0x${string}` | null;
-  const { data: ensName } = useEnsName({ address: peer ?? undefined, query: { enabled: !!peer } });
+  const { data: ensName } = useVerifiedEnsName({ address: peer ?? undefined, query: { enabled: !!peer } });
   const { data: avatar } = useEnsAvatar({ name: ensName ? safeNormalize(ensName) : undefined, query: { enabled: !!ensName } });
   const display = ensName ?? (peer ? `${peer.slice(0, 6)}…${peer.slice(-4)}` : 'Unknown peer');
   const preview = typeof row.lastMessage?.content === 'string' ? row.lastMessage.content : '';

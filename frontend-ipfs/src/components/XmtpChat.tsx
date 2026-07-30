@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAccount, useEnsName, useEnsAvatar } from 'wagmi';
+import { useAccount, useEnsAvatar } from 'wagmi';
+import { useVerifiedEnsName } from '../hooks/useVerifiedEnsName';
 import { normalize } from 'viem/ens';
 import { Loader2, Mic, Plus, Smile, Send, AlertCircle, X } from 'lucide-react';
 import {
@@ -459,7 +460,7 @@ function MessageBubble({ message, fromMe, inGroup, senderAddress, showSender }: 
 }
 
 function SenderAvatar({ address }: { address: `0x${string}` | null }) {
-  const { data: ensName } = useEnsName({ address: address ?? undefined, query: { enabled: !!address } });
+  const { data: ensName } = useVerifiedEnsName({ address: address ?? undefined, query: { enabled: !!address } });
   const { data: avatar } = useEnsAvatar({
     name: ensName ? safeNormalize(ensName) : undefined,
     query: { enabled: !!ensName },
@@ -469,7 +470,7 @@ function SenderAvatar({ address }: { address: `0x${string}` | null }) {
 }
 
 function SenderName({ address, inboxId }: { address: `0x${string}` | null; inboxId: string }) {
-  const { data: ensName } = useEnsName({ address: address ?? undefined, query: { enabled: !!address } });
+  const { data: ensName } = useVerifiedEnsName({ address: address ?? undefined, query: { enabled: !!address } });
   const label = ensName
     ?? (address ? `${address.slice(0, 6)}…${address.slice(-4)}` : `${inboxId.slice(0, 6)}…`);
   return <div className="font-mono text-[11px] text-text-muted mb-1 ml-1 truncate">{label}</div>;

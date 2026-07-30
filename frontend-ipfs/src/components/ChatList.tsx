@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Search, Plus, MessageSquare, Loader2, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useAccount, useEnsName, useEnsAvatar, useEnsAddress } from 'wagmi';
+import { useAccount, useEnsAvatar, useEnsAddress } from 'wagmi';
+import { useVerifiedEnsName } from '../hooks/useVerifiedEnsName';
 import { normalize } from 'viem/ens';
 import { isAddress } from 'viem';
 import { ConsentState, type Dm, type DecodedMessage } from '@xmtp/browser-sdk';
@@ -146,7 +147,7 @@ export function ChatList({ className = '' }: { className?: string }) {
 
 function ChatRow({ row, active, onOpen }: { row: Row; active: boolean; onOpen: (addr: string) => void }) {
   const peer = row.peerAddress as `0x${string}` | null;
-  const { data: ensName } = useEnsName({ address: peer ?? undefined, query: { enabled: !!peer } });
+  const { data: ensName } = useVerifiedEnsName({ address: peer ?? undefined, query: { enabled: !!peer } });
   const { data: avatar } = useEnsAvatar({ name: ensName ? safeNormalize(ensName) : undefined, query: { enabled: !!ensName } });
   const display = ensName ?? (peer ? `${peer.slice(0, 6)}…${peer.slice(-4)}` : 'Unknown');
   const preview = typeof row.lastMessage?.content === 'string' ? (row.lastMessage.content as string) : '';

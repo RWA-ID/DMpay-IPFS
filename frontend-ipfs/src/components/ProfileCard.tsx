@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { useAccount, useEnsAddress, useEnsName, useEnsAvatar, useEnsText, useReadContract } from 'wagmi';
+import { useAccount, useEnsAddress, useEnsAvatar, useEnsText, useReadContract } from 'wagmi';
+import { useVerifiedEnsName, useEnsNameStatus } from '../hooks/useVerifiedEnsName';
 import { normalize } from 'viem/ens';
 import { isAddress, formatUnits, formatEther } from 'viem';
 import { Globe, AtSign, Code2, Send, Infinity as InfinityIcon, MessageCircle, ShieldCheck, ArrowRight, AlertCircle } from 'lucide-react';
@@ -22,9 +23,16 @@ export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
   });
   const address = (isAddr ? nameOrAddress : resolvedAddr) as `0x${string}` | undefined;
 
-  const { data: resolvedName } = useEnsName({ address, query: { enabled: isAddr && !!address } });
+  const { data: resolvedName } = useVerifiedEnsName({ address, query: { enabled: isAddr && !!address } });
   const ensName = isEns ? nameOrAddress : resolvedName ?? undefined;
   const normalized = ensName ? safeNormalize(ensName) : undefined;
+
+  // Reverse-resolved names arrive already screened by useVerifiedEnsName, but a
+  // name typed straight into the URL is forward-resolved, and a lapsed name's
+  // stale addr record answers exactly like a live one. Paying it sends real
+  // money to an address whose claim on the name has run out.
+  const { status: nameStatus } = useEnsNameStatus(normalized);
+  const nameExpired = nameStatus === 'expired';
 
   const { data: avatar } = useEnsAvatar({ name: normalized, query: { enabled: !!normalized } });
   const { data: description } = useEnsText({ name: normalized, key: 'description', query: { enabled: !!normalized } });
@@ -86,6 +94,21 @@ export function ProfileCard({ nameOrAddress }: { nameOrAddress: string }) {
 
   return (
     <article className="bg-bg-panel border border-border-subtle rounded-3xl overflow-hidden">
+      {nameExpired && (
+        <div className="bg-amber-500/5 border-b border-amber-500/30 px-7 sm:px-10 py-4 flex gap-3">
+          <AlertCircle size={16} className="text-amber-400 shrink-0 mt-0.5" />
+          <div className="text-sm text-text-secondary">
+            <div className="text-text-primary font-medium mb-1">
+              {ensName} has expired and is available for registration
+            </div>
+            The address below is a leftover record from the previous holder — ENS keeps
+            answering with it until somebody re-registers the name. Nobody owns this name
+            right now, so it proves nothing about who you'd be paying. Confirm the address
+            through another channel first.
+          </div>
+        </div>
+      )}
+
       {/* SPLIT HERO — avatar left, identity/eyebrow/display name right */}
       <header className="px-7 sm:px-10 pt-9 pb-7 border-b border-border-subtle">
         <div className="flex items-start gap-5 sm:gap-7">
