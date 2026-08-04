@@ -47,6 +47,18 @@ export const SHARE_HOST = SHARE_URL.replace(/^https?:\/\//, '');
 export const shareUrl = (path: string) => `${SHARE_URL}${path}`;
 export const shareLabel = (path: string) => `${SHARE_HOST}${path}`;
 
+/**
+ * Host serving the app's few server-side endpoints (currently the NFT picker
+ * proxy, which exists to keep the OpenSea key out of the bundle).
+ *
+ * Always the Pages host, for the same reason as SHARE_URL: the IPFS build has
+ * no server of its own. Kept separate from SHARE_URL because they can diverge —
+ * one decides which URL gets pasted into a tweet, the other which host answers
+ * an fetch. Features behind this must degrade, never block: see NftPicker.
+ */
+export const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
+  ?? 'https://app.dmpay.me';
+
 export const profileUrl = (idOrEns: string) => shareUrl(`/u/${idOrEns}`);
 export const profileLabel = (idOrEns: string) => shareLabel(`/u/${idOrEns}`);
 

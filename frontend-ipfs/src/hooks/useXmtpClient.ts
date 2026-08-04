@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAccount, useWalletClient } from 'wagmi';
 import { Client } from '@xmtp/browser-sdk';
 import { makeXmtpSigner, revokeAllInstallations, XMTP_ENV } from '../lib/xmtp';
+// Tip / NFT cards. Must be registered at create time on *both* paths below —
+// a client built without them decodes those messages as undefined content,
+// which renders as nothing at all rather than as the fallback text.
+import { dmpayCodecs } from '../lib/chatContent';
 
 let cachedClient: Client<unknown> | null = null;
 let cachedAddr: string | null = null;
@@ -37,7 +41,7 @@ export function useXmtpClient() {
     try {
       console.log('[XMTP] creating client for', address);
       const signer = makeXmtpSigner(walletClient);
-      const c = await Client.create(signer, { env: XMTP_ENV } as Parameters<typeof Client.create>[1]);
+      const c = await Client.create(signer, { env: XMTP_ENV, codecs: dmpayCodecs } as Parameters<typeof Client.create>[1]);
       cachedClient = c;
       cachedAddr = address;
       setClient(c);
@@ -77,7 +81,7 @@ export function useXmtpClient() {
       const n = await revokeAllInstallations(walletClient);
       console.log('[XMTP] revoked', n, 'installations; creating new client…');
       const signer = makeXmtpSigner(walletClient);
-      const c = await Client.create(signer, { env: XMTP_ENV } as Parameters<typeof Client.create>[1]);
+      const c = await Client.create(signer, { env: XMTP_ENV, codecs: dmpayCodecs } as Parameters<typeof Client.create>[1]);
       cachedClient = c;
       cachedAddr = address ?? null;
       setClient(c);

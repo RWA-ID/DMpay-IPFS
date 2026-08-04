@@ -118,3 +118,27 @@ export const erc20Abi = [
     inputs: [{ name: 'account', type: 'address' }], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'decimals', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] },
 ] as const;
+
+/**
+ * NFT transfers go straight to the collection's own contract — DMpay's
+ * contracts are not involved and take no fee. `safeTransferFrom` is the only
+ * function needed to send; `ownerOf` / `balanceOf` re-check ownership at send
+ * time, since a picker built from an indexer can be stale by a block or an hour.
+ */
+export const erc721Abi = [
+  { type: 'function', name: 'safeTransferFrom', stateMutability: 'nonpayable',
+    inputs: [{ name: 'from', type: 'address' }, { name: 'to', type: 'address' }, { name: 'tokenId', type: 'uint256' }],
+    outputs: [] },
+  { type: 'function', name: 'ownerOf', stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }], outputs: [{ type: 'address' }] },
+] as const;
+
+export const erc1155Abi = [
+  { type: 'function', name: 'safeTransferFrom', stateMutability: 'nonpayable',
+    inputs: [{ name: 'from', type: 'address' }, { name: 'to', type: 'address' },
+             { name: 'id', type: 'uint256' }, { name: 'amount', type: 'uint256' }, { name: 'data', type: 'bytes' }],
+    outputs: [] },
+  { type: 'function', name: 'balanceOf', stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }, { name: 'id', type: 'uint256' }],
+    outputs: [{ type: 'uint256' }] },
+] as const;

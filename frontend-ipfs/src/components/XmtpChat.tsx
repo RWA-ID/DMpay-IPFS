@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAccount, useEnsAvatar } from 'wagmi';
 import { useVerifiedEnsName } from '../hooks/useVerifiedEnsName';
 import { normalize } from 'viem/ens';
-import { Loader2, Mic, Plus, Smile, Send, AlertCircle, X } from 'lucide-react';
+import { Loader2, Mic, Plus, Smile, Send, AlertCircle, X, Coins, Image as ImageIcon } from 'lucide-react';
 import {
   encryptAttachment,
   decryptAttachment,
@@ -29,6 +29,10 @@ import { useXmtpClient } from '../hooks/useXmtpClient';
 import { Avatar } from './Avatar';
 import { ethIdentifier } from '../lib/xmtp';
 import { uploadEncryptedToPinata, fetchAttachment } from '../lib/pinata';
+import { asNftSend, asTip } from '../lib/chatContent';
+import { NftCard, TipCard } from './ChatCards';
+import { TipComposer } from './TipComposer';
+import { NftComposer } from './NftComposer';
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -45,7 +49,7 @@ export function XmtpChat({ recipient, recipientName, conversation: provided, sen
   senderDirectory?: Map<string, `0x${string}`>;
 }) {
   const { client, init, initializing, error, revokeAndRetry, needsRevoke } = useXmtpClient();
-  useAccount();
+  const { address: me } = useAccount();
   const [conversation, setConversation] = useState<Dm<unknown> | Group<unknown> | null>(null);
   const [messages, setMessages] = useState<DecodedMessage<unknown>[]>([]);
   const [myInboxId, setMyInboxId] = useState<string | null>(null);
@@ -56,6 +60,8 @@ export function XmtpChat({ recipient, recipientName, conversation: provided, sen
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [pendingImage, setPendingImage] = useState<{ file: File; previewUrl: string } | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
+  const [composer, setComposer] = useState<'tip' | 'nft' | null>(null);
+  const [showActions, setShowActions] = useState(false);
   const [recipientReachable, setRecipientReachable] = useState<boolean | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<{ end: () => Promise<unknown> } | null>(null);
@@ -63,6 +69,15 @@ export function XmtpChat({ recipient, recipientName, conversation: provided, sen
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (!client && !initializing) init(); }, [client, init, initializing]);
+
+  // Who a tip or NFT can be aimed at. A DM has exactly one answer; a group has
+  // no address of its own, so the composer offers the roster instead — minus
+  // yourself, and minus members who never published an address.
+  const tipCandidates = senderDirectory
+    ? [...new Set(senderDirectory.values())].filter((a) => a && a.toLowerCase() !== me?.toLowerCase())
+    : [];
+  const composerTarget = senderDirectory ? null : (recipient ?? null);
+  const canSendValue = senderDirectory ? tipCandidates.length > 0 : !!recipient;
 
   useEffect(() => {
     if (!client) return;
@@ -297,13 +312,19 @@ export function XmtpChat({ recipient, recipientName, conversation: provided, sen
           // Attribute incoming group messages, and only on the first of a run
           // from the same sender — repeating it on every line is noise.
           const startsRun = messages[i - 1]?.senderInboxId !== m.senderInboxId;
+          // Tip/NFT cards verify the sender's claim against the address behind
+          // the XMTP identity. A DM has only two parties, so it's known without
+          // a directory lookup.
+          const senderAddress = senderDirectory
+            ? (senderDirectory.get(m.senderInboxId) ?? null)
+            : (fromMe ? (me ?? null) : (recipient ?? null));
           return (
             <MessageBubble
               key={m.id}
               message={m}
               fromMe={fromMe}
               inGroup={!!senderDirectory}
-              senderAddress={senderDirectory?.get(m.senderInboxId) ?? null}
+              senderAddress={senderAddress}
               showSender={startsRun}
             />
           );
@@ -366,13 +387,40 @@ export function XmtpChat({ recipient, recipientName, conversation: provided, sen
           </>
         )}
 
+        {showActions && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setShowActions(false)} />
+            <div className="absolute bottom-20 left-4 z-20 w-52 bg-bg-panel border border-border-subtle rounded-2xl shadow-pop overflow-hidden">
+              <ActionItem
+                icon={<Plus size={15} />}
+                label="Image"
+                onClick={() => { setShowActions(false); fileInputRef.current?.click(); }}
+              />
+              <ActionItem
+                icon={<Coins size={15} />}
+                label="Tip"
+                sub={canSendValue ? 'USDC or ETH' : 'No recipient yet'}
+                disabled={!canSendValue}
+                onClick={() => { setShowActions(false); setComposer('tip'); }}
+              />
+              <ActionItem
+                icon={<ImageIcon size={15} />}
+                label="NFT"
+                sub={canSendValue ? 'From your wallet' : 'No recipient yet'}
+                disabled={!canSendValue}
+                onClick={() => { setShowActions(false); setComposer('nft'); }}
+              />
+            </div>
+          </>
+        )}
+
         <div className="flex items-center gap-2 bg-bg-elevated rounded-2xl px-3 py-2 focus-within:ring-1 focus-within:ring-brand">
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setShowActions((s) => !s)}
             disabled={uploading}
-            title="Send image"
-            className="p-2 text-text-secondary hover:text-text-primary disabled:opacity-50"
+            title="Send image, tip or NFT"
+            className={`p-2 hover:text-text-primary disabled:opacity-50 transition-transform ${showActions ? 'text-brand rotate-45' : 'text-text-secondary'}`}
           >
             {uploading ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
           </button>
@@ -407,7 +455,48 @@ export function XmtpChat({ recipient, recipientName, conversation: provided, sen
           End-to-end encrypted via XMTP
         </div>
       </div>
+
+      {composer === 'tip' && (
+        <TipComposer
+          conversation={conversation}
+          target={composerTarget}
+          candidates={tipCandidates}
+          onClose={() => setComposer(null)}
+          onSent={() => setComposer(null)}
+        />
+      )}
+      {composer === 'nft' && (
+        <NftComposer
+          conversation={conversation}
+          target={composerTarget}
+          candidates={tipCandidates}
+          onClose={() => setComposer(null)}
+          onSent={() => setComposer(null)}
+        />
+      )}
     </>
+  );
+}
+
+function ActionItem({ icon, label, sub, onClick, disabled }: {
+  icon: React.ReactNode;
+  label: string;
+  sub?: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="w-full px-3.5 py-2.5 flex items-center gap-3 text-left hover:bg-bg-hover disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+    >
+      <span className="w-7 h-7 rounded-lg bg-chip grid place-items-center text-text-primary shrink-0">{icon}</span>
+      <span className="min-w-0">
+        <span className="block text-sm text-text-primary">{label}</span>
+        {sub && <span className="block text-[10px] text-text-muted truncate">{sub}</span>}
+      </span>
+    </button>
   );
 }
 
@@ -419,6 +508,14 @@ function MessageBubble({ message, fromMe, inGroup, senderAddress, showSender }: 
   showSender?: boolean;
 }) {
   const time = new Date(Number(message.sentAtNs / 1_000_000n)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // Value transfers are events, not speech — they get their own full-width
+  // card rather than a bubble, and skip the avatar gutter entirely.
+  const tip = asTip(message as any);
+  if (tip) return <TipCard tip={tip} fromMe={fromMe} senderAddress={senderAddress ?? null} />;
+  const nft = asNftSend(message as any);
+  if (nft) return <NftCard nft={nft} fromMe={fromMe} senderAddress={senderAddress ?? null} />;
+
   const text = typeof message.content === 'string' ? message.content : null;
   const inline = isAttachment(message as any) ? (message.content as Attachment) : null;
   const remote = isRemoteAttachment(message as any) ? (message.content as RemoteAttachment) : null;
