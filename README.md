@@ -226,4 +226,4 @@ MIT.
 
 ---
 
-Built by [@hectormorel](https://x.com/ensgianteth) at [RWA-ID](https://github.com/RWA-ID).
+Built by [Hector Morel](https://x.com/ensgianteth) ([@ensgianteth](https://x.com/ensgianteth)) at [RWA-ID](https://github.com/RWA-ID).
