@@ -51,6 +51,8 @@ function buyLifetimePassETH(address recipient) external payable
 function isUnlocked(address recipient, address sender) external view returns (bool)
 ```
 
+`payMessage*` is what the app's **tipping** feature runs on. It takes a sender-chosen amount, splits it 97.5 / 2.5, and emits `MessagePaid` — and, unlike `openConversation*`, it does not touch `openedAt`. Tipping someone therefore never silently unlocks a paid thread, which is why tips needed no new contract and no new state.
+
 #### Receiver-side controls
 
 These are the V2 additions. A recipient can block a sender permanently, or close a conversation so the sender must pay again to reopen it:
@@ -89,6 +91,50 @@ USDC fees transfer straight to the treasury during payment. ETH fees cannot — 
 function setTreasury(address _treasury) external onlyOwner
 function withdrawEthFees() external onlyOwner
 ```
+
+---
+
+## What the contract deliberately does not do
+
+Two features that appear inside a DMpay conversation touch this contract lightly or not at all. That is a design position, not a gap.
+
+**NFT sends have no protocol surface.** Sending an NFT in a chat is a plain `safeTransferFrom` on the collection's own contract. No DMpay contract is in the path, no fee is taken, and no API — marketplace or otherwise — can perform the transfer: only the owner's wallet can authorise it. Adding a passthrough here would have meant custody, an approval surface, and a fee on someone else's asset, for no gain.
+
+**Message content is never on-chain.** The contract settles payment and records access; XMTP carries the words. The tip and NFT cards the app renders in a thread are XMTP messages, not contract calls.
+
+That second point has a security consequence worth stating in the protocol docs, because it constrains what any client may believe. A card claiming "tipped you 500 USDC" is bytes a peer chose to send — anyone can craft one, or replay a `txHash` from a payment someone else made. **The chain is the only authority.** A correct client resolves a card by pulling the transaction receipt and decoding the log it actually emitted:
+
+| Card | Verified against |
+|---|---|
+| Tip | `MessagePaid` emitted by `DMPayDirectV2`, matching the claimed sender, recipient, token and amount — and the sender checked against the XMTP identity that sent the message |
+| NFT send | ERC-721 `Transfer` / ERC-1155 `TransferSingle` on the claimed collection, matching contract, token id, from and to |
+
+Anything unverified must not be displayed as fact, and anything that fails should be labelled rather than hidden — a silently dropped card is indistinguishable from a network hiccup.
+
+---
+
+### Events
+
+```solidity
+event PriceSet(address indexed user, uint256 usdc, uint256 eth, uint256 lifetimeUsdc, uint256 lifetimeEth);
+event ConversationOpened(address indexed sender, address indexed recipient, address indexed token, uint256 amountPaid, uint256 fee);
+event MessagePaid(address indexed sender, address indexed recipient, address indexed token, uint256 amountPaid, uint256 fee);
+event LifetimePassPurchased(address indexed sender, address indexed recipient, address indexed token, uint256 amountPaid, uint256 fee);
+
+event SenderBlocked(address indexed recipient, address indexed sender);
+event SenderUnblocked(address indexed recipient, address indexed sender);
+event ConversationClosed(address indexed recipient, address indexed sender, uint64 closedAt);
+
+event GroupCreated(uint256 indexed id, address indexed creator, uint256 priceUsdc, uint256 priceEth, uint64 capacity);
+event GroupXmtpIdSet(uint256 indexed id, bytes32 xmtpGroupId);
+event GroupJoined(uint256 indexed id, address indexed member, address indexed token, uint256 amountPaid, uint256 fee);
+event GroupMemberRemoved(uint256 indexed id, address indexed member);
+event GroupClosed(uint256 indexed id);
+
+event TreasuryUpdated(address indexed newTreasury);
+```
+
+`token` is the USDC address on USDC paths and the zero address on ETH paths. The app indexes `PriceSet` to build its creator directory, so any recipient who has ever priced is discoverable without a registry.
 
 ---
 
@@ -158,6 +204,8 @@ ETHERSCAN_API_KEY=your_etherscan_key
 npx hardhat compile
 npx hardhat test
 ```
+
+12 tests cover V2 in [`test/DMPayDirectV2.ts`](./test/DMPayDirectV2.ts) — the four price tiers, USDC and ETH conversation opens with the correct split, lifetime pass grant and duplicate rejection, `payMessage` in both assets, block / unblock / close semantics, the lifetime-pass bypass, group create / join / capacity / double-join / close, creator-only access control, and the admin paths. 15 more cover V1 in [`test/DMPayDirect.ts`](./test/DMPayDirect.ts).
 
 ### Deploy V2 to mainnet
 
