@@ -6,10 +6,16 @@
 @tailwind utilities;
 
 html, body, #root {
-  height: 100%;
-  /* Use dynamic viewport height on mobile so the URL bar / keyboard shrink
-     the viewport gracefully and the chat composer stays reachable. */
-  min-height: 100dvh;
+  /* Exact viewport height, never a minimum.
+     Every route scrolls inside its own pane — App.tsx wraps them all in
+     overflow-hidden — so the shell has to be a hard ceiling. `min-height` is a
+     floor: it let the shell grow as messages arrived, which meant the message
+     list's own overflow-y-auto never reached its limit and the whole page grew
+     instead of scrolling.
+     dvh (with a vh fallback) keeps the composer reachable when the mobile URL
+     bar or keyboard shrinks the viewport. */
+  height: 100vh;
+  height: 100dvh;
   margin: 0;
   background: #0B0B0A;
   color: #F2F0E8;
@@ -18,6 +24,48 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
   text-rendering: geometricPrecision;
   letter-spacing: -0.005em;
+}
+
+body {
+  /* The document itself never scrolls; panes do. Without this the shell can be
+     dragged around on iOS while a pane is already at its scroll limit, which
+     reads as the layout coming loose. */
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/*
+ * RainbowKitProvider renders an unclassed <div data-rk> between #root and the
+ * app shell. Left at its default auto height it silently breaks the
+ * percentage-height chain: `h-full` on the shell resolves against an
+ * auto-height parent, so it becomes auto too, and every pane below inherits
+ * content-sized height instead of a viewport-sized one. Nothing can scroll
+ * internally after that — the message list just grows and pushes the document
+ * taller, which is exactly what the chat was doing.
+ *
+ * Verified in-page: without this rule /terms gave a 3184px document against an
+ * 894px viewport; with it the document is 894px and <main> scrolls its own
+ * 3137px of content.
+ */
+#root > [data-rk] {
+  height: 100%;
+}
+
+/* iOS Safari zooms the whole page when a focused input's text is under 16px,
+   and never zooms back out. Every composer field here is text-sm or text-xs, so
+   tapping the message box would leave the chat scaled up and cut off.
+ *
+ * Targeted by element+class (0,1,1) rather than a bare `input` (0,0,1): a bare
+ * selector loses to Tailwind's own `.text-sm` (0,1,0) and silently does
+ * nothing — media queries contribute no specificity. Listing the small
+ * utilities explicitly also avoids `!important`, which would drag the tip
+ * composer's text-2xl amount field down to 16px too. */
+@media (max-width: 640px) {
+  input.text-sm, input.text-xs,
+  textarea.text-sm, textarea.text-xs,
+  select.text-sm, select.text-xs {
+    font-size: 16px;
+  }
 }
 
 .font-mono, code, kbd {

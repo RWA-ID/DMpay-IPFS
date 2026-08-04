@@ -299,7 +299,10 @@ export function XmtpChat({ recipient, recipientName, conversation: provided, sen
 
   return (
     <>
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-3">
+      <div
+        ref={scrollRef}
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-3"
+      >
         {messages.length === 0 && (
           <div className="text-center text-text-muted text-sm py-12">
             {provided
@@ -377,12 +380,20 @@ export function XmtpChat({ recipient, recipientName, conversation: provided, sen
         </div>
       )}
 
-      <div className="relative p-4 border-t border-border-subtle">
+      <div className="relative p-3 sm:p-4 border-t border-border-subtle shrink-0">
         {showEmoji && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setShowEmoji(false)} />
-            <div className="absolute bottom-20 left-4 z-20 shadow-2xl rounded-2xl overflow-hidden">
-              <EmojiPicker theme={EmojiTheme.DARK} onEmojiClick={onEmojiClick} lazyLoadEmojis width={320} height={380} />
+            {/* Pinned to the left gutter, but never wider than the viewport —
+                a fixed 320px picker overflows a 360px phone once padding is in. */}
+            <div className="absolute bottom-20 left-4 right-4 sm:right-auto z-20 shadow-2xl rounded-2xl overflow-hidden">
+              <EmojiPicker
+                theme={EmojiTheme.DARK}
+                onEmojiClick={onEmojiClick}
+                lazyLoadEmojis
+                width="100%"
+                height={320}
+              />
             </div>
           </>
         )}
@@ -440,13 +451,17 @@ export function XmtpChat({ recipient, recipientName, conversation: provided, sen
             placeholder={`Message ${recipientName}...`}
             className="flex-1 bg-transparent text-text-primary placeholder:text-text-muted focus:outline-none text-sm py-1"
           />
+          {/* Labels collapse to the icon on narrow screens — at 360px the text
+              versions squeeze the input down to a few characters. */}
           {draft.trim() ? (
-            <button onClick={send} disabled={sending} className="bg-brand hover:bg-brand-hover disabled:opacity-50 text-brand-ink rounded-full px-4 py-2 flex items-center gap-2 text-sm font-medium">
-              {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} Send
+            <button onClick={send} disabled={sending} aria-label="Send" className="shrink-0 bg-brand hover:bg-brand-hover disabled:opacity-50 text-brand-ink rounded-full p-2.5 sm:px-4 sm:py-2 flex items-center gap-2 text-sm font-medium">
+              {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+              <span className="hidden sm:inline">Send</span>
             </button>
           ) : (
-            <button className="bg-brand hover:bg-brand-hover text-brand-ink rounded-full px-4 py-2 flex items-center gap-2 text-sm font-medium">
-              <Mic size={16} /> Voice
+            <button aria-label="Voice" className="shrink-0 bg-brand hover:bg-brand-hover text-brand-ink rounded-full p-2.5 sm:px-4 sm:py-2 flex items-center gap-2 text-sm font-medium">
+              <Mic size={16} />
+              <span className="hidden sm:inline">Voice</span>
             </button>
           )}
         </div>
@@ -523,7 +538,7 @@ function MessageBubble({ message, fromMe, inGroup, senderAddress, showSender }: 
   if (!text && !inline && !remote) return null;
 
   const bubble = (
-    <div className={`max-w-md px-4 py-2.5 rounded-bubble text-sm leading-relaxed break-words ${
+    <div className={`max-w-[85%] sm:max-w-md px-4 py-2.5 rounded-bubble text-sm leading-relaxed break-words ${
       fromMe ? 'bg-bubble-outgoing text-brand-ink' : 'bg-bubble-incoming text-text-primary'
     }`}>
       {text && <div className="whitespace-pre-wrap">{text}</div>}

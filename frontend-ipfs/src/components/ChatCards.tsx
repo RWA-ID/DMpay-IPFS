@@ -1,6 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { usePublicClient } from 'wagmi';
+import { useEnsAvatar, usePublicClient } from 'wagmi';
+import { normalize } from 'viem/ens';
 import { ArrowUpRight, BadgeCheck, ImageOff, Loader2, ShieldAlert } from 'lucide-react';
+import { useVerifiedEnsName } from '../hooks/useVerifiedEnsName';
+import { Avatar } from './Avatar';
 import {
   formatTipAmount,
   txUrl,
@@ -73,6 +76,44 @@ function VerifyBadge({ state }: { state: VerifyState }) {
   );
 }
 
+function safeNormalize(name: string) {
+  try {
+    return normalize(name);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The counterparty, named. A card that reads "5 USDC · 0xabc…1234" makes the
+ * reader do the lookup themselves; in a group with several people it's the
+ * only way to tell who was actually tipped.
+ *
+ * Falls back to a truncated address — a name is a nicety, and an unnamed
+ * wallet must still render.
+ */
+function PartyLabel({ address, prefix }: { address: `0x${string}`; prefix: string }) {
+  const { data: ensName } = useVerifiedEnsName({ address });
+  const { data: avatar } = useEnsAvatar({
+    name: ensName ? safeNormalize(ensName) : undefined,
+    query: { enabled: !!ensName },
+  });
+  const label = ensName ?? `${address.slice(0, 6)}…${address.slice(-4)}`;
+
+  return (
+    <div className="flex items-center gap-1.5 min-w-0">
+      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-text-faint shrink-0">{prefix}</span>
+      <Avatar src={avatar || undefined} fallback={label[0] ?? '?'} size={16} />
+      <span
+        className={`text-[12px] truncate ${ensName ? 'text-text-secondary' : 'font-mono text-text-muted'}`}
+        title={address}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
 function TxLink({ hash }: { hash: string }) {
   return (
     <a
@@ -115,14 +156,20 @@ export function TipCard({ tip, fromMe, senderAddress }: {
             <VerifyBadge state={state} />
           </div>
 
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-baseline gap-2 flex-wrap">
             <span
-              className={`dm-display font-mono text-[34px] leading-none transition-opacity ${trusted ? 'opacity-100' : 'opacity-45'}`}
+              className={`dm-display font-mono text-[30px] sm:text-[34px] leading-none transition-opacity ${trusted ? 'opacity-100' : 'opacity-45'}`}
               style={{ color: tint }}
             >
               {amount}
             </span>
             <span className="font-mono text-[13px] text-text-secondary">{tip.asset}</span>
+          </div>
+
+          {/* Whoever isn't the reader: the payer on an incoming tip, the payee
+              on one you sent. Naming both would just restate "you". */}
+          <div className="mt-2.5">
+            <PartyLabel address={fromMe ? tip.to : tip.from} prefix={fromMe ? 'to' : 'from'} />
           </div>
 
           {tip.note && (
@@ -182,6 +229,9 @@ export function NftCard({ nft, fromMe, senderAddress }: {
           {nft.collection && (
             <div className="text-[11px] text-text-muted truncate mt-0.5">{nft.collection}</div>
           )}
+          <div className="mt-2">
+            <PartyLabel address={fromMe ? nft.to : nft.from} prefix={fromMe ? 'to' : 'from'} />
+          </div>
           <div className="mt-2.5 flex items-center justify-between">
             <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-text-faint">
               {nft.standard === 'erc1155' ? 'ERC-1155' : 'ERC-721'}

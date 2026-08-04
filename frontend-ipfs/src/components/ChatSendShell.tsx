@@ -24,10 +24,13 @@ export function SendModal({ title, kicker, onClose, children }: {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-bg-panel border border-border-subtle rounded-3xl shadow-pop my-auto"
+        // Capped to the viewport with the body scrolling inside it: the header
+        // and the action button stay put while a long NFT grid or an open
+        // keyboard eats the space between them.
+        className="w-full max-w-md bg-bg-panel border border-border-subtle rounded-3xl shadow-pop my-auto flex flex-col max-h-[calc(100dvh-2rem)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between px-6 pt-5 pb-4 border-b border-border-subtle">
+        <div className="flex items-start justify-between px-6 pt-5 pb-4 border-b border-border-subtle shrink-0">
           <div>
             <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted mb-1">{kicker}</div>
             <h3 className="dm-display text-xl text-text-primary">{title}</h3>
@@ -40,7 +43,7 @@ export function SendModal({ title, kicker, onClose, children }: {
             <X size={18} />
           </button>
         </div>
-        <div className="px-6 py-5">{children}</div>
+        <div className="px-6 py-5 overflow-y-auto overscroll-contain min-h-0">{children}</div>
       </div>
     </div>
   );
