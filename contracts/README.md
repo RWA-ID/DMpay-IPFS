@@ -153,17 +153,17 @@ npx hardhat ignition deploy ignition/modules/DMPayMainnet.ts --network mainnet
 ```
 contracts/
 ├── contracts/
-│   ├── DMPayRegistry.sol        # Profile registry + ENS subdomain manager
-│   └── DMPayMessaging.sol       # Pay-to-message USDC payment handler
+│   ├── DMPayDirectV2.sol        # Current: paid DMs, groups, block/close, bypass
+│   ├── DMPayDirect.sol          # Superseded by V2
+│   ├── DMPayRegistry.sol        # Legacy: profile registry + ENS subdomain manager
+│   └── DMPayMessaging.sol       # Legacy: pay-to-message USDC payment handler
 ├── ignition/
 │   └── modules/
 │       ├── DMPay.ts             # Sepolia deployment module
 │       └── DMPayMainnet.ts      # Mainnet deployment module
 ├── scripts/
+│   ├── deploy-v2-mainnet.ts     # DMPayDirectV2 mainnet deployment
 │   └── send-op-tx.ts            # Utility for sending ops transactions
-├── setContenthash.mjs           # Script to manually set ENS contenthash (Sepolia)
-├── setContenthashMainnet.mjs    # Script to manually set ENS contenthash (Mainnet)
-├── setSubdomainContent.mjs      # Script to set subdomain content records
 ├── hardhat.config.ts            # Hardhat configuration
 └── test/
     └── Counter.ts               # Contract tests
