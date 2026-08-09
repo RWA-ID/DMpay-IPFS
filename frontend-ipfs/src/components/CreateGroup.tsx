@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, usePublicClient, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { parseUnits, parseEther, decodeEventLog } from 'viem';
-import { ArrowLeft, Users, Loader2, CheckCircle2, AlertCircle, Sparkles, Copy, Image as ImageIcon } from 'lucide-react';
+import { namehash } from 'viem/ens';
+import { ArrowLeft, Users, Loader2, CheckCircle2, AlertCircle, Sparkles, Copy, Globe, Image as ImageIcon } from 'lucide-react';
 import { DMPAY_DIRECT_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
+import { publicResolverAbi } from '../lib/ens';
+import { encodeGroupMeta, groupTextKey, verifiedEnsName } from '../lib/groupMeta';
 import { useXmtpClient } from '../hooks/useXmtpClient';
 import { groupUrl } from '../lib/site';
 import { uploadPublicToPinata } from '../lib/pinata';
@@ -14,6 +17,7 @@ import { ShareGroup } from './ShareGroup';
 export function CreateGroup() {
   const navigate = useNavigate();
   const { address, isConnected } = useAccount();
+  const publicClient = usePublicClient();
   const { openConnectModal } = useConnectModal();
   const { client: xmtp, init: initXmtp, initializing } = useXmtpClient();
 
@@ -31,16 +35,53 @@ export function CreateGroup() {
   const createReceipt = useWaitForTransactionReceipt({ hash: createTx.data });
   const linkTx = useWriteContract();
   const linkReceipt = useWaitForTransactionReceipt({ hash: linkTx.data });
+  const publishTx = useWriteContract();
+  const publishReceipt = useWaitForTransactionReceipt({ hash: publishTx.data });
 
   const [groupId, setGroupId] = useState<bigint | null>(null);
   const [xmtpGroupId, setXmtpGroupId] = useState<string | null>(null);
   const [creatingXmtp, setCreatingXmtp] = useState(false);
   const [xmtpError, setXmtpError] = useState<string | null>(null);
 
+  // Publishing the group's public identity needs a name the creator provably
+  // owns and a resolver we can write to. Either being absent turns the option
+  // off rather than failing mid-flow. See GroupSettings for the same check.
+  const [ensName, setEnsName] = useState<string | null>(null);
+  const [resolver, setResolver] = useState<`0x${string}` | null>(null);
+  const [ensChecked, setEnsChecked] = useState(false);
+  const [publish, setPublish] = useState(true);
+  // Frozen at submit: the checkbox can't be reached once the flow is running,
+  // and a late-resolving ENS lookup must not change what the flow promised.
+  const [willPublish, setWillPublish] = useState(false);
+
   const txError = createTx.error ?? createReceipt.error ?? linkTx.error ?? linkReceipt.error;
   const priceMissing = !usdc && !eth;
   const nameMissing = !name.trim();
   const canSubmit = isConnected && !priceMissing && !nameMissing && !createTx.isPending && !createReceipt.isLoading;
+  const canPublish = !!ensName && !!resolver;
+
+  // 0) Resolve the creator's own ENS name up front, so the publish option is
+  //    already settled by the time the first transaction confirms.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Cleared on disconnect or a wallet switch, so a previous account's name
+      // can't be offered as the place to publish.
+      if (!address || !publicClient) {
+        if (!cancelled) { setEnsName(null); setResolver(null); setEnsChecked(false); }
+        return;
+      }
+      const verified = await verifiedEnsName(address);
+      if (cancelled) return;
+      setEnsName(verified);
+      if (verified) {
+        const r = await publicClient.getEnsResolver({ name: verified }).catch(() => null);
+        if (!cancelled) setResolver(r);
+      }
+      if (!cancelled) setEnsChecked(true);
+    })();
+    return () => { cancelled = true; };
+  }, [address, publicClient]);
 
   // 1) When the contract create tx confirms, parse the GroupCreated event for the new id.
   useEffect(() => {
@@ -95,6 +136,26 @@ export function CreateGroup() {
     })();
   }, [groupId, xmtp, xmtpGroupId, creatingXmtp, linkTx, name, description]);
 
+  // 3) Publish the public copy. XMTP group metadata is encrypted to members, so
+  //    without this a non-member sees only "Group #id" — on Discover, on the
+  //    creator's profile, and in a shared link. Written last: it's the only
+  //    optional step, and a rejected signature here still leaves a working group.
+  useEffect(() => {
+    if (!linkReceipt.isSuccess || groupId === null) return;
+    if (!willPublish || !ensName || !resolver) return;
+    if (publishTx.data || publishTx.isPending) return;
+    publishTx.writeContract({
+      address: resolver,
+      abi: publicResolverAbi,
+      functionName: 'setText',
+      args: [
+        namehash(ensName) as `0x${string}`,
+        groupTextKey(groupId),
+        encodeGroupMeta({ name: name.trim(), image: imageUrl }),
+      ],
+    });
+  }, [linkReceipt.isSuccess, groupId, willPublish, ensName, resolver, publishTx.data, publishTx.isPending]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -117,6 +178,7 @@ export function CreateGroup() {
 
   function submit() {
     if (!address || !canSubmit) return;
+    setWillPublish(publish && canPublish);
     createTx.writeContract({
       address: DMPAY_DIRECT_ADDRESS,
       abi: dmpayDirectAbi,
@@ -132,7 +194,15 @@ export function CreateGroup() {
   const onChainDone = createReceipt.isSuccess && groupId !== null;
   const xmtpDone = !!xmtpGroupId;
   const linkDone = linkReceipt.isSuccess;
-  const allDone = onChainDone && xmtpDone && linkDone;
+  const publishDone = publishReceipt.isSuccess;
+  const publishError = (publishTx.error as any)?.shortMessage ?? publishTx.error?.message ?? publishReceipt.error?.message ?? null;
+  // A failed publish is not a failed group: the chat exists and works, only the
+  // public name is missing, and settings can retry it. So it settles the step
+  // rather than blocking the success card.
+  const publishSettled = !willPublish || publishDone || !!publishError;
+  const allDone = onChainDone && xmtpDone && linkDone && publishSettled;
+  // Before submit the step previews the current checkbox; after, what was frozen.
+  const showPublishStep = createTx.data ? willPublish : publish && canPublish;
   const shareUrl = groupId !== null ? groupUrl(groupId, name) : '';
 
   if (!isConnected) {
@@ -141,7 +211,7 @@ export function CreateGroup() {
         <div className="text-center max-w-sm">
           <Users className="text-brand mx-auto mb-4" size={32} />
           <h2 className="text-xl font-semibold text-text-primary mb-2">Connect to create a paid group</h2>
-          <p className="text-text-secondary mb-6 text-sm">You'll sign two transactions: one to create the on-chain group, one to link the XMTP chat.</p>
+          <p className="text-text-secondary mb-6 text-sm">You'll sign two transactions: one to create the on-chain group, one to link the XMTP chat — plus an optional third to publish its name publicly.</p>
           <button onClick={() => openConnectModal?.()} className="bg-brand hover:bg-brand-hover text-brand-ink rounded-2xl px-6 py-3 font-medium">
             Connect wallet
           </button>
@@ -161,6 +231,22 @@ export function CreateGroup() {
             </div>
             <h1 className="dm-display text-4xl text-text-primary">{name}</h1>
             <p className="text-text-secondary text-sm mt-2">Your paid group is live on Ethereum + XMTP.</p>
+
+            {publishDone ? (
+              <div className="mt-3 text-[12px] text-brand inline-flex items-center gap-1.5">
+                <Globe size={13} /> Published on {ensName} — anyone can see the name and image.
+              </div>
+            ) : willPublish && publishError ? (
+              <div className="mt-3 text-[12px] text-text-muted leading-relaxed break-words">
+                The group is live, but publishing its public name failed: {publishError} Everyone outside
+                the group sees “Group #{groupId!.toString()}” until you retry from group settings.
+              </div>
+            ) : !willPublish ? (
+              <div className="mt-3 text-[12px] text-text-muted leading-relaxed">
+                Only members can see the name and image. Publish them from group settings to show them on
+                Discover and in shared links.
+              </div>
+            ) : null}
 
             <div className="mt-6 bg-bg-elevated border border-border-subtle rounded-xl p-3 flex items-center gap-2">
               <code className="flex-1 text-xs text-text-secondary truncate text-left">{shareUrl}</code>
@@ -276,11 +362,57 @@ export function CreateGroup() {
             />
           </Field>
 
+          {/* ── The public copy ──
+              XMTP metadata is members-only, so without this the group is
+              nameless to everyone who hasn't joined yet — including whoever
+              opens the share link. Offered here so the common case takes one
+              pass instead of a return trip through group settings. */}
+          {!createTx.data && (
+            <div className="rounded-2xl border border-border-subtle bg-bg-elevated p-4">
+              <label className={`flex items-start gap-3 ${canPublish ? 'cursor-pointer' : 'opacity-60'}`}>
+                <input
+                  type="checkbox"
+                  checked={publish && canPublish}
+                  disabled={!canPublish}
+                  onChange={(e) => setPublish(e.target.checked)}
+                  className="mt-0.5 accent-current"
+                />
+                <div className="min-w-0">
+                  <div className="text-[13px] font-medium text-text-primary inline-flex items-center gap-1.5">
+                    <Globe size={12} /> Publish the name and image publicly
+                  </div>
+                  <div className="text-[11.5px] text-text-muted mt-1 leading-relaxed">
+                    {!ensChecked ? (
+                      'Checking your ENS name…'
+                    ) : !ensName ? (
+                      'Needs an ENS name set as your primary name. Without one, everyone outside the group sees only its number — on Discover, on your profile, and in the link you share.'
+                    ) : !resolver ? (
+                      <>
+                        <span className="font-mono text-text-secondary">{ensName}</span> has no resolver set.
+                        Set one in the ENS app, then publish from group settings.
+                      </>
+                    ) : (
+                      <>
+                        Writes them to <span className="font-mono text-text-secondary">me.dmpay.group.&lt;id&gt;</span> on{' '}
+                        <span className="font-mono text-text-secondary">{ensName}</span>, so Discover, your profile and
+                        shared links can show them. One extra transaction — you can also do it later from group settings.
+                      </>
+                    )}
+                  </div>
+                </div>
+              </label>
+            </div>
+          )}
+
           <ProgressList
             steps={[
               { label: 'Create group on-chain', state: stateFor('create', createTx, createReceipt) },
               { label: xmtp ? 'Create XMTP group' : 'Connect XMTP', state: !onChainDone ? 'pending' : !xmtp ? (initializing ? 'loading' : 'pending') : creatingXmtp ? 'loading' : xmtpError ? 'error' : xmtpDone ? 'done' : 'pending' },
               { label: 'Link XMTP id on-chain', state: !xmtpDone ? 'pending' : linkTx.isPending || linkReceipt.isLoading ? 'loading' : linkDone ? 'done' : 'pending' },
+              ...(showPublishStep ? [{
+                label: 'Publish name & image publicly',
+                state: (!linkDone ? 'pending' : publishDone ? 'done' : publishError ? 'error' : publishTx.isPending || publishReceipt.isLoading ? 'loading' : 'pending') as Step,
+              }] : []),
             ]}
           />
 
@@ -320,7 +452,7 @@ export function CreateGroup() {
           )}
 
           <div className="text-[11px] text-text-muted text-center">
-            Two on-chain transactions total. Group is non-custodial: payments settle directly to your wallet.
+            {showPublishStep ? 'Three' : 'Two'} on-chain transactions total. Group is non-custodial: payments settle directly to your wallet.
           </div>
         </div>
       </div>
