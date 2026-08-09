@@ -76,7 +76,9 @@ Recipients get real control after the sale. `blockSender` is permanent; `closeCo
 
 Anyone can open a group chat with a join price and an optional member cap. On-chain membership is the source of truth for who has paid; the XMTP group is the transport, bound to the on-chain group afterwards via `setGroupXmtpId`. Lifetime-pass holders join that creator's groups free.
 
-Because XMTP group metadata is encrypted to members, a non-member would otherwise see nothing. So a creator can optionally publish a **public group identity as an ENS text record** under `me.dmpay.group.<id>` on their own name — the one public keystore they already control. Members always read the real XMTP metadata; only outsiders fall back to the published copy.
+Because XMTP group metadata is encrypted to members, a non-member would otherwise see nothing — Discover, the creator's profile and every shared link would all read `Group #<id>`. So a creator can publish a **public group identity as an ENS text record** under `me.dmpay.group.<id>` on their own name — the one public keystore they already control. It's offered as an optional third transaction while the group is being created, and again at any time from group settings. Members always read the real XMTP metadata; only outsiders fall back to the published copy.
+
+The record is written **on the creator's own name, not the group's** — a group has no ENS name. The creator's primary name is the precondition rather than the target: it's what tells the app which name to write to, and it's round-tripped and expiry-checked before it's trusted. Without one there is nothing to publish to, so the option is unavailable and the group stays nameless to outsiders.
 
 ### Tips
 
@@ -204,7 +206,7 @@ Development happens on the `dmpay-ipfs` branch, which is pushed to both.
 - **No backend, no oracle, no relayer.** Every read hits Ethereum directly; every write is a user-signed transaction.
 - **Bidirectional unlock.** Payment in either direction opens the pair.
 - **Receipts are verified, never trusted.** See *Verified receipts* above.
-- **Public group identity is opt-in.** It costs a transaction, so creators choose. The public copy can drift from the encrypted one, which is why members read XMTP and only outsiders read ENS.
+- **Public group identity is opt-in.** It costs a transaction, so creators choose — and it needs a primary ENS name to write to, so a creator without one can't publish at all. The public copy can drift from the encrypted one, which is why members read XMTP and only outsiders read ENS.
 - **Expiry is checked, not assumed.** An expired ENS name passes the forward/reverse round trip. Only `BaseRegistrar.nameExpires` tells the truth.
 
 ---
