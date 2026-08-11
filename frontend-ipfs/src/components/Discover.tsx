@@ -8,6 +8,7 @@ import { ArrowRight, Loader2, Search, Users } from 'lucide-react';
 import { Footer } from './Footer';
 import { Avatar } from './Avatar';
 import { GroupGrid } from './GroupCard';
+import { AssetAmount } from './AssetMark';
 import { usePublicGroups, useLocalGroupMeta, usePublicGroupMeta } from '../hooks/useGroups';
 import { hasXmtpId } from '../lib/groups';
 import { DMPAY_DIRECT_ADDRESS } from '../lib/contracts';
@@ -187,14 +188,22 @@ function CreatorCard({ c }: { c: Creator }) {
       {description && (
         <p className="text-[13px] text-text-secondary leading-snug line-clamp-2">{String(description)}</p>
       )}
-      <div className="flex items-center justify-between mt-auto pt-3 border-t border-border-subtle">
-        <div>
+      <div className="flex items-center justify-between mt-auto pt-3 border-t border-border-subtle gap-3">
+        <div className="min-w-0">
           <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">Per DM</div>
-          <div className="font-mono text-[15px] font-medium text-text-primary mt-1">
-            {c.usdc > 0n ? `$${formatUnits(c.usdc, 6)}` : c.eth > 0n ? `${formatEther(c.eth)} ETH` : '—'}
+          {/* Both prices when both are set. The old version showed USDC and
+              silently dropped the ETH price, so a creator who priced in both
+              appeared to accept only one — and the marks make which is which
+              readable without parsing the number. */}
+          <div className="flex items-center gap-3 flex-wrap mt-1 text-[15px] font-medium text-text-primary">
+            {c.usdc > 0n && <AssetAmount asset="USDC" amount={formatUnits(c.usdc, 6)} />}
+            {c.eth > 0n && <AssetAmount asset="ETH" amount={formatEther(c.eth)} />}
+            {c.usdc === 0n && c.eth === 0n && (
+              <span className="font-mono text-text-muted">—</span>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-1 text-text-muted">
+        <div className="flex items-center gap-1 text-text-muted shrink-0">
           <span className="font-mono text-[10px] uppercase tracking-[0.14em]">Message</span>
           <ArrowRight size={14} />
         </div>

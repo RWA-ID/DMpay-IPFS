@@ -2,7 +2,8 @@ import { useNavigate } from 'react-router-dom';
 import { useVerifiedEnsName } from '../hooks/useVerifiedEnsName';
 import { ArrowRight, Loader2, Users } from 'lucide-react';
 import { GroupAvatar } from './GroupAvatar';
-import { hasXmtpId, xmtpIdKey, seatPriceLabel, type PublicGroup } from '../lib/groups';
+import { hasXmtpId, xmtpIdKey, seatPrices, type PublicGroup } from '../lib/groups';
+import { AssetAmount } from './AssetMark';
 import { groupPath } from '../lib/site';
 import type { GroupMetaMap, PublicMetaMap } from '../hooks/useGroups';
 
@@ -32,7 +33,7 @@ export function GroupCard({ group, meta, publicMeta, showCreator = true }: {
   const creatorLabel = ensName ?? `${group.creator.slice(0, 6)}…${group.creator.slice(-4)}`;
   const full = group.capacity > 0n && group.memberCount >= group.capacity;
   const linked = hasXmtpId(group.xmtpGroupId);
-  const price = seatPriceLabel(group) ?? 'Free';
+  const prices = seatPrices(group);
 
   return (
     <button
@@ -73,12 +74,18 @@ export function GroupCard({ group, meta, publicMeta, showCreator = true }: {
         )}
       </div>
 
-      <div className="flex items-center justify-between mt-auto pt-3 border-t border-border-subtle">
-        <div>
+      <div className="flex items-center justify-between mt-auto pt-3 border-t border-border-subtle gap-3">
+        <div className="min-w-0">
           <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">Per seat</div>
-          <div className="font-mono text-[15px] font-medium text-text-primary mt-1">{price}</div>
+          {/* Every asset the seat is priced in, each with its mark — matching
+              the creator cards on the same page. */}
+          <div className="flex items-center gap-3 flex-wrap mt-1 text-[15px] font-medium text-text-primary">
+            {prices.length === 0
+              ? <span className="font-mono">Free</span>
+              : prices.map((p) => <AssetAmount key={p.asset} asset={p.asset} amount={p.amount} />)}
+          </div>
         </div>
-        <div className="flex items-center gap-1 text-text-muted">
+        <div className="flex items-center gap-1 text-text-muted shrink-0">
           <span className="font-mono text-[10px] uppercase tracking-[0.14em]">{group.active && !full ? 'Join' : 'View'}</span>
           <ArrowRight size={14} />
         </div>

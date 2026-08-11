@@ -36,6 +36,39 @@ export function seatPriceLabel(group: { priceUsdc: bigint; priceEth: bigint }): 
   return null;
 }
 
+/**
+ * The same seat price, but split by asset so a card can put a coin mark next
+ * to each figure.
+ *
+ * `seatPriceLabel` returns the first non-zero price as one string, which is
+ * right for a share caption or a page title but wrong for a price row: a group
+ * priced in both assets showed only the USDC figure, so the ETH price was
+ * invisible to anyone browsing. This returns every price that's actually set.
+ */
+export function seatPrices(group: { priceUsdc: bigint; priceEth: bigint }): Array<{
+  asset: 'USDC' | 'ETH';
+  amount: string;
+}> {
+  const prices: Array<{ asset: 'USDC' | 'ETH'; amount: string }> = [];
+  if (group.priceUsdc > 0n) {
+    prices.push({
+      asset: 'USDC',
+      amount: Number(formatUnits(group.priceUsdc, 6)).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    });
+  }
+  if (group.priceEth > 0n) {
+    const [whole, frac] = formatEther(group.priceEth).split('.');
+    prices.push({
+      asset: 'ETH',
+      amount: frac ? `${whole}.${frac.slice(0, 5).replace(/0+$/, '') || '0'}` : whole,
+    });
+  }
+  return prices;
+}
+
 export const ZERO_BYTES32 = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
 /** wagmi returns the getter as a positional tuple; name the fields. */
