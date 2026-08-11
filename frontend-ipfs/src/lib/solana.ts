@@ -147,13 +147,66 @@ export function availableSolanaWallets(): SolanaWallet[] {
   }
 }
 
+/**
+ * A Solana account this wallet has *already* authorised for this origin.
+ *
+ * The Wallet Standard populates `wallet.accounts` at registration when the
+ * origin was previously granted access, so a returning visitor needs no second
+ * connect click. Checking this first is the difference between "click your
+ * wallet, then see your balance" and just seeing the balance.
+ *
+ * It cannot help on a first visit: until the user approves once, the array is
+ * empty by design. Connecting to the same extension for Ethereum doesn't fill
+ * it either — an EVM connection and a Solana connection are separate grants
+ * inside one wallet, which is why being "already connected" in the app's top
+ * bar isn't enough on its own.
+ *
+ * Accounts are filtered by chain because a multi-chain wallet lists its EVM
+ * accounts here too, and an 0x address would fail base58 decoding downstream.
+ */
+export function authorisedSolanaAccount(wallet: SolanaWallet): string | null {
+  try {
+    const account = (wallet.handle.accounts ?? []).find((a: any) =>
+      a?.chains?.includes(SOLANA_CHAIN),
+    );
+    if (!account?.address) return null;
+    return new PublicKey(account.address).toBase58();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The first wallet already holding an authorised Solana account, if any.
+ * Returns the wallet and the address together so the caller can go straight
+ * to showing a balance.
+ */
+export function preAuthorisedSolanaWallet(): { wallet: SolanaWallet; address: string } | null {
+  for (const wallet of availableSolanaWallets()) {
+    const address = authorisedSolanaAccount(wallet);
+    if (address) return { wallet, address };
+  }
+  return null;
+}
+
 /** Connect and return the account's base58 address. */
 export async function connectSolanaWallet(wallet: SolanaWallet): Promise<string> {
   const connect = wallet.handle.features[FEATURE_CONNECT] as { connect: () => Promise<{ accounts: any[] }> };
   const { accounts } = await connect.connect();
-  const account = accounts?.[0];
-  if (!account) throw new Error('No account was shared by the wallet');
-  return new PublicKey(account.address).toBase58();
+
+  // Take the first *Solana* account, not the first account. A multi-chain
+  // wallet returns its EVM accounts in the same array, and an 0x address is
+  // not valid base58 — decoding one throws rather than returning a wrong
+  // answer, which would surface here as an unexplained failure to connect.
+  const account = (accounts ?? []).find((a: any) => a?.chains?.includes(SOLANA_CHAIN)) ?? accounts?.[0];
+  if (!account) {
+    throw new Error('That wallet shared no account. If it has no Solana account yet, create one first.');
+  }
+  try {
+    return new PublicKey(account.address).toBase58();
+  } catch {
+    throw new Error('That wallet shared no Solana account. Create one in the wallet, then try again.');
+  }
 }
 
 /**
@@ -204,8 +257,14 @@ export async function sendSolTip({
   const feature = wallet.handle.features[FEATURE_SIGN_AND_SEND] as {
     signAndSendTransaction: (input: any) => Promise<Array<{ signature: Uint8Array }>>;
   };
-  const account = wallet.handle.accounts.find((a: any) => new PublicKey(a.address).toBase58() === from)
-    ?? wallet.handle.accounts[0];
+  // Match on the raw address string rather than round-tripping every entry
+  // through PublicKey: a multi-chain wallet lists EVM accounts here too, and
+  // constructing a PublicKey from an 0x address throws — inside `find`, that
+  // aborts the whole search and the send fails before it starts.
+  const account =
+    wallet.handle.accounts.find((a: any) => a?.address === from) ??
+    wallet.handle.accounts.find((a: any) => a?.chains?.includes(SOLANA_CHAIN));
+  if (!account) throw new Error('That wallet no longer has the Solana account this tip was set up with');
 
   const [result] = await feature.signAndSendTransaction({
     account,

@@ -9,6 +9,7 @@ import { useSolanaAddress } from '../hooks/useSolanaAddress';
 import {
   availableSolanaWallets,
   connectSolanaWallet,
+  preAuthorisedSolanaWallet,
   lamportsToSol,
   sendSolTip,
   solToLamports,
@@ -55,7 +56,26 @@ export function SolTipComposer({ conversation, target, candidates, onClose, onSe
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
-  useEffect(() => { setWallets(availableSolanaWallets()); }, []);
+  useEffect(() => {
+    setWallets(availableSolanaWallets());
+
+    // If a wallet has already granted this origin a Solana account, use it
+    // rather than asking again — the balance should just be there. Wallets
+    // register asynchronously, so re-check briefly instead of reading once on
+    // mount and concluding there's nothing.
+    let settled = false;
+    const adopt = () => {
+      if (settled) return;
+      const found = preAuthorisedSolanaWallet();
+      if (!found) return;
+      settled = true;
+      setWallet(found.wallet);
+      setFrom(found.address);
+    };
+    adopt();
+    const timers = [150, 400, 900].map((ms) => setTimeout(() => { setWallets(availableSolanaWallets()); adopt(); }, ms));
+    return () => timers.forEach(clearTimeout);
+  }, []);
 
   useEffect(() => {
     if (!from) return;
@@ -183,6 +203,19 @@ export function SolTipComposer({ conversation, target, candidates, onClose, onSe
             </>
           ) : (
             <>
+              {/* Which account is actually paying. A multi-account wallet gives
+                  no clue otherwise, and the recipient's address is shown in
+                  full just above — the payer deserves the same treatment. */}
+              <div className="flex items-center gap-1.5 mb-3 min-w-0">
+                {wallet?.icon && <img src={wallet.icon} alt="" className="w-3.5 h-3.5 rounded shrink-0" />}
+                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-text-faint shrink-0">
+                  from
+                </span>
+                <span className="font-mono text-[10.5px] text-text-muted truncate" title={from}>
+                  {from.slice(0, 6)}…{from.slice(-4)}
+                </span>
+              </div>
+
               <div className="flex items-baseline justify-between mb-2">
                 <FieldLabel>Amount</FieldLabel>
                 {balance !== null && (
