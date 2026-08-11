@@ -160,8 +160,9 @@ export function SolTipComposer({ conversation, target, candidates, onClose, onSe
               <FieldLabel>Connect a Solana wallet</FieldLabel>
               {wallets.length === 0 ? (
                 <div className="text-sm text-text-muted leading-relaxed">
-                  No Solana wallet detected in this browser. Phantom, Solflare and Backpack all work —
-                  install one and reopen this.
+                  No Solana wallet detected in this browser. Phantom, Solflare and Backpack all
+                  work, as do MetaMask and Trust Wallet once they have a Solana account — install
+                  one and reopen this.
                 </div>
               ) : (
                 <div className="rounded-2xl border border-border-subtle divide-y divide-border-subtle overflow-hidden">
