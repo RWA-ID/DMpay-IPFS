@@ -144,8 +144,14 @@ export function ChatView() {
   }
 
   return (
-    <main className="flex-1 flex flex-col bg-bg-base min-h-0">
-      <header className="flex items-center gap-3 p-4 border-b border-border-subtle">
+    // min-w-0 is load-bearing, not tidiness. A flex item defaults to
+    // min-width:auto, so this column refuses to shrink below the min-content
+    // width of what's inside it — and one 42-character token address or a long
+    // URL in a message sets that floor above a phone's width. The parent
+    // clips with overflow-hidden, so the excess doesn't scroll, it just
+    // disappears off the right edge. Measured at 390px: 617px wide without it.
+    <main className="flex-1 flex flex-col bg-bg-base min-h-0 min-w-0">
+      <header className="flex items-center gap-3 p-4 border-b border-border-subtle shrink-0">
         <button
           onClick={() => navigate('/inbox')}
           className="md:hidden p-2 -ml-2 text-text-secondary hover:text-text-primary rounded-lg hover:bg-bg-hover"

@@ -105,7 +105,10 @@ export function GroupView() {
   const groupName = meta.name || published?.name || `Group #${id.toString()}`;
 
   return (
-    <main className="flex-1 flex flex-col bg-bg-base min-h-0">
+    // min-w-0 for the same reason as ChatView: without it this column can't
+    // shrink below the min-content width of the longest message in it, and a
+    // pasted contract address pushes it past the width of a phone.
+    <main className="flex-1 flex flex-col bg-bg-base min-h-0 min-w-0">
       <GroupHeader
         id={id}
         group={group}
