@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2, CheckCircle2, Coins, Infinity as InfinityIcon, AlertCircle } from 'lucide-react';
 import { Avatar } from './Avatar';
 import { DMPAY_DIRECT_ADDRESS, dmpayDirectAbi } from '../lib/contracts';
+import { useEthUsdPrice, ethInputToUsd } from '../lib/prices';
 
 export function Settings() {
   const navigate = useNavigate();
@@ -189,9 +190,24 @@ export function Settings() {
 }
 
 function PriceField({ label, unit, value, onChange, placeholder, step = '0.01' }: { label: string; unit: string; value: string; onChange: (v: string) => void; placeholder?: string; step?: string; }) {
+  const { usd: ethUsd } = useEthUsdPrice();
+
+  // ETH is the only unit that needs translating — a USDC field is already the
+  // number the sender recognises. Rendering "≈ $5.00" next to "5 USDC" would
+  // be noise pretending to be information.
+  const usdHint = unit === 'ETH' ? ethInputToUsd(value, ethUsd) : null;
+
   return (
     <label className="block">
-      <div className="text-sm text-text-secondary mb-2">{label}</div>
+      <div className="flex items-baseline justify-between mb-2 gap-3">
+        <span className="text-sm text-text-secondary">{label}</span>
+        {/* Reserves no space when absent: the hint appears as you type, and a
+            row that reflows on every keystroke is worse than one that grows
+            once. */}
+        {usdHint && (
+          <span className="font-mono text-[11px] text-text-muted tabular-nums">≈ {usdHint}</span>
+        )}
+      </div>
       <div className="flex items-center bg-bg-elevated rounded-xl px-4 py-3 focus-within:ring-1 focus-within:ring-brand">
         <input
           type="number"

@@ -6,6 +6,7 @@ import type { Dm, Group } from '@xmtp/browser-sdk';
 import { DMPAY_DIRECT_ADDRESS, USDC_ADDRESS, dmpayDirectAbi, erc20Abi } from '../lib/contracts';
 import { tipCodec, type TipAsset, type TipContent } from '../lib/chatContent';
 import { ErrorNote, FieldLabel, SendModal, TargetPicker } from './ChatSendShell';
+import { useEthUsdPrice, ethInputToUsd } from '../lib/prices';
 
 const NOTE_MAX = 120;
 const PRESETS: Record<TipAsset, string[]> = {
@@ -42,6 +43,9 @@ export function TipComposer({ conversation, target, candidates, onClose, onSent 
 
   const recipient = target ?? picked;
   const isUSDC = asset === 'USDC';
+
+  const { usd: ethUsd } = useEthUsdPrice();
+  const usdHint = ethInputToUsd(amount, ethUsd);
 
   const parsed = useMemo(() => {
     const raw = amount.trim();
@@ -185,6 +189,11 @@ export function TipComposer({ conversation, target, candidates, onClose, onSent 
         placeholder="0.00"
         className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 dm-display font-mono text-2xl text-text-primary placeholder:text-text-faint focus:outline-none focus:border-brand"
       />
+      {/* Tipping in ETH is where a sender is least sure what they're sending.
+          Only shown for ETH: a USDC amount is already denominated in dollars. */}
+      {!isUSDC && usdHint && (
+        <div className="mt-1.5 font-mono text-[11px] text-text-muted tabular-nums">≈ {usdHint}</div>
+      )}
       <div className="flex gap-2 mt-2 mb-5">
         {PRESETS[asset].map((p) => (
           <button
