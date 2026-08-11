@@ -17,7 +17,9 @@ Protocol reference: [`../contracts/README.md`](../contracts/README.md). Project 
 | Wallet | wagmi v3 + viem v2 + RainbowKit (dark theme) |
 | Routing | react-router-dom v7 — `BrowserRouter` or `HashRouter`, chosen by build mode |
 | Identity | ENS forward/reverse resolution, `BaseRegistrar` expiry check, in-app `.eth` registration |
-| Messaging | `@xmtp/browser-sdk` v7 (XMTP V3, MLS) + DMpay's own tip / NFT-send codecs |
+| Messaging | `@xmtp/browser-sdk` v7 (XMTP V3, MLS) + DMpay's own content-type codecs |
+| Solana | `@solana/web3.js` + Wallet Standard (`@wallet-standard/app`) — SOL tips only |
+| Market data | Chainlink ETH/USD on-chain; DexScreener for token prices |
 
 ---
 
@@ -34,10 +36,74 @@ Create a `.env` (gitignored) with:
 |---|---|---|
 | `VITE_WC_PROJECT_ID` | [Reown / WalletConnect](https://cloud.reown.com) | Wallet connection |
 | `VITE_PINATA_JWT` | [Pinata](https://app.pinata.cloud) | Group-image upload, IPFS pinning |
+| `VITE_SOLANA_RPC` | Any Solana RPC (optional) | SOL tips. Falls back to the public mainnet endpoint, which is fine at tip volume since it's called from the user's own browser, not a Worker. |
 
 `.env.pages` and `.env.ipfs` are committed and hold the per-target routing config (`VITE_PUBLIC_URL`, `VITE_CLEAN_URLS`, `VITE_SHARE_URL`, `VITE_API_URL`). They're selected by build mode and ignored by `npm run dev`.
 
 `OPENSEA_API_KEY` powers the NFT picker. It is a **Cloudflare Pages environment variable**, set in the project settings and read server-side by `functions/api/nfts.js` — never bundled, and not needed locally.
+
+`functions/api/unfurl.js` needs no key at all.
+
+---
+
+## Message content types
+
+Beyond plain text and attachments, the app registers five codecs of its own in
+[`src/lib/chatContent.ts`](./src/lib/chatContent.ts). Every one carries a
+`fallback` that stands alone as a sentence, because for Converse / Coinbase
+Wallet / xmtp.chat users that fallback *is* the message.
+
+| Type | Carries | Verified against |
+|---|---|---|
+| `tip` | A `DMPayDirectV2.payMessage*` receipt | The contract's `MessagePaid` log |
+| `nft-send` | A `safeTransferFrom` receipt | The transfer log |
+| `sol-tip` | A bare SOL transfer receipt | Pre/post balance deltas on Solana |
+| `link-preview` | Message text **plus** its OpenGraph card | Nothing — it's presentation |
+| `token-share` | A token pointer + the price when shared | Live price is re-fetched per reader; the shared-at price is the sender's claim and is labelled as one |
+
+### Link previews are built by the sender
+
+A browser can't read a third party's OpenGraph tags — CORS forbids it — so
+previews need a server. The naive design has each recipient unfurl the links it
+receives, which in an end-to-end encrypted app would tell this server the URL of
+every link in every private conversation and leak each reader's IP to the image
+host.
+
+So the **sender** unfurls at compose time, for a link they chose and already
+know, and the preview travels inside the encrypted payload with its thumbnail
+inlined as a `data:` URI. Rendering a received preview makes **no network
+request at all**. Links that arrive without one — sent from another client, or
+where the unfurl failed — get a clickable link and an explicit "load preview"
+button, so that fetch stays the reader's choice.
+
+`functions/api/unfurl.js` fetches arbitrary user-supplied URLs and is guarded
+accordingly: scheme allowlist, rejection of private/loopback/link-local
+addresses (including `169.254.169.254`), a redirect chain walked by hand so
+every hop is re-checked, a timeout, and a byte cap.
+
+### Token shares
+
+`src/lib/tokens.ts` reads DexScreener — no API key, permissive CORS, so the
+IPFS build calls it directly with no backend in the path. It covers pairs that
+started trading an hour ago, which listing-based APIs don't. (OpenSea, the app's
+other market data source, is an NFT index and has no prices for ERC-20s.)
+
+Pair selection always takes the **deepest liquidity**, and the UI always shows
+the contract address and liquidity next to the symbol — a $300 pool can be made
+to print any price, and deploying a token called USDC costs nothing.
+
+### SOL tips take no fee
+
+Every other payment routes through `DMPayDirectV2`, which splits 97.5 / 2.5. A
+SOL tip is a bare `SystemProgram.transfer`: there is no program in the path that
+*could* take a cut, so the recipient receives exactly what was sent and the only
+deduction is the network's ~0.000005 SOL. "No platform fee" is a property of the
+instruction, not a policy.
+
+The recipient's address comes from their ENS `addr` record at **SLIP-44 coin
+type 501** — so a user opts in by setting one record, with no new registry.
+Note 501 is a plain SLIP-44 type, *not* an ENSIP-11 chain-specific one, so none
+of the `0x80000000 | chainId` signed-32-bit trouble applies.
 
 ---
 

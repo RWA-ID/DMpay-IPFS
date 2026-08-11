@@ -5,11 +5,14 @@ import { ArrowUpRight, BadgeCheck, ImageOff, Loader2, ShieldAlert } from 'lucide
 import { useVerifiedEnsName } from '../hooks/useVerifiedEnsName';
 import { Avatar } from './Avatar';
 import {
+  formatSol,
   formatTipAmount,
   txUrl,
   type NftSendContent,
+  type SolTipContent,
   type TipContent,
 } from '../lib/chatContent';
+import { solscanTx, verifySolTip, type SolVerifyState } from '../lib/solana';
 import { verifyNftSend, verifyTip, type VerifyState } from '../lib/chatReceipts';
 import { nftTitle } from '../lib/nfts';
 
@@ -29,6 +32,9 @@ const ASSET_TINT: Record<string, string> = {
   USDC: '#4D9EE4',
   ETH: '#8C99E0',
 };
+
+/** Solana's purple, pulled toward the ink palette like the other two. */
+const SOL_TINT = '#9E7BE8';
 
 function useVerification(
   kind: 'tip' | 'nft',
@@ -182,6 +188,91 @@ export function TipCard({ tip, fromMe, senderAddress }: {
         <div className="px-5 py-2.5 border-t border-border-subtle/70 flex items-center justify-between bg-bg-base/30">
           <span className="font-mono text-[10px] text-text-faint">97.5% settled directly</span>
           <TxLink hash={tip.txHash} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A SOL tip.
+ *
+ * Same shape as TipCard so the two read as siblings, with two differences that
+ * matter. The footer says the recipient got the whole amount rather than 97.5%
+ * — that's the actual distinction between the two rails, and it's the reason
+ * someone would choose this one. And the parties are base58 Solana addresses,
+ * not Ethereum ones, so there's no ENS name to show for them: the sender's
+ * *identity* in this chat is their Ethereum address, but the money moved
+ * between two unrelated Solana keys, and conflating them would be a lie.
+ */
+export function SolTipCard({ tip, fromMe }: { tip: SolTipContent; fromMe: boolean }) {
+  const client = usePublicClient();
+  const { data } = useQuery<SolVerifyState>({
+    queryKey: ['sol-receipt', tip.signature],
+    enabled: !!client,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: 1,
+    queryFn: () => verifySolTip(tip.signature, tip.to, Number(tip.lamports)),
+  });
+  const state: VerifyState = (data ?? { status: 'pending' }) as VerifyState;
+  const trusted = state.status === 'verified';
+  const amount = formatSol(tip.lamports);
+  const counterparty = fromMe ? tip.to : tip.from;
+
+  return (
+    <div className="flex justify-center py-1">
+      <div
+        className="w-full max-w-sm rounded-2xl border border-border-subtle bg-bg-panel overflow-hidden shadow-card"
+        style={{
+          backgroundImage: `linear-gradient(160deg, ${SOL_TINT}22 0%, ${SOL_TINT}0A 42%, transparent 78%)`,
+        }}
+      >
+        <div className="px-5 pt-4 pb-3">
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
+              {fromMe ? '· SOL tip sent' : '· SOL tip received'}
+            </span>
+            <VerifyBadge state={state} />
+          </div>
+
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span
+              className={`dm-display font-mono text-[30px] sm:text-[34px] leading-none transition-opacity ${trusted ? 'opacity-100' : 'opacity-45'}`}
+              style={{ color: SOL_TINT }}
+            >
+              {amount}
+            </span>
+            <span className="font-mono text-[13px] text-text-secondary">SOL</span>
+          </div>
+
+          <div className="mt-2.5 flex items-center gap-1.5 min-w-0">
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-text-faint shrink-0">
+              {fromMe ? 'to' : 'from'}
+            </span>
+            <span className="font-mono text-[11px] text-text-muted truncate" title={counterparty}>
+              {counterparty.slice(0, 6)}…{counterparty.slice(-4)}
+            </span>
+          </div>
+
+          {tip.note && (
+            <p className="mt-3 text-[13px] leading-snug text-text-secondary break-words">
+              “{tip.note}”
+            </p>
+          )}
+        </div>
+
+        <div className="px-5 py-2.5 border-t border-border-subtle/70 flex items-center justify-between bg-bg-base/30">
+          <span className="font-mono text-[10px] text-text-faint">100% — no platform fee</span>
+          <a
+            href={solscanTx(tip.signature)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-0.5 font-mono text-[10px] text-text-faint hover:text-text-secondary transition-colors"
+          >
+            {tip.signature.slice(0, 6)}…{tip.signature.slice(-4)}
+            <ArrowUpRight size={10} />
+          </a>
         </div>
       </div>
     </div>

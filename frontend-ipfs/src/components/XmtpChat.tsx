@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAccount, useEnsAvatar } from 'wagmi';
 import { useVerifiedEnsName } from '../hooks/useVerifiedEnsName';
 import { normalize } from 'viem/ens';
-import { Loader2, Mic, Plus, Smile, Send, AlertCircle, X, Coins, Image as ImageIcon } from 'lucide-react';
+import { Loader2, Mic, Plus, Smile, Send, AlertCircle, X, Coins, Image as ImageIcon, TrendingUp, Sparkles } from 'lucide-react';
 import {
   encryptAttachment,
   decryptAttachment,
@@ -29,10 +29,16 @@ import { useXmtpClient } from '../hooks/useXmtpClient';
 import { Avatar } from './Avatar';
 import { ethIdentifier } from '../lib/xmtp';
 import { uploadEncryptedToPinata, fetchAttachment } from '../lib/pinata';
-import { asNftSend, asTip } from '../lib/chatContent';
-import { NftCard, TipCard } from './ChatCards';
+import { asLinkPreview, asNftSend, asSolTip, asTip, asTokenShare, linkPreviewCodec, type LinkPreviewContent } from '../lib/chatContent';
+import { MessageText } from './MessageText';
+import { firstUrl } from '../lib/links';
+import { unfurl } from '../lib/unfurl';
+import { NftCard, SolTipCard, TipCard } from './ChatCards';
 import { TipComposer } from './TipComposer';
 import { NftComposer } from './NftComposer';
+import { TokenComposer } from './TokenComposer';
+import { TokenCard } from './TokenCard';
+import { SolTipComposer } from './SolTipComposer';
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -60,7 +66,7 @@ export function XmtpChat({ recipient, recipientName, conversation: provided, sen
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [pendingImage, setPendingImage] = useState<{ file: File; previewUrl: string } | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
-  const [composer, setComposer] = useState<'tip' | 'nft' | null>(null);
+  const [composer, setComposer] = useState<'tip' | 'nft' | 'token' | 'sol' | null>(null);
   const [showActions, setShowActions] = useState(false);
   const [recipientReachable, setRecipientReachable] = useState<boolean | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -157,7 +163,20 @@ export function XmtpChat({ recipient, recipientName, conversation: provided, sen
     setDraft('');
     setSending(true);
     try {
-      await conversation.sendText(text);
+      // Unfurl here, in the sender's client, so the preview rides inside the
+      // encrypted message and no recipient ever fetches anything to render it.
+      // See lib/unfurl.ts for why that's worth a moment's delay on send.
+      const url = firstUrl(text);
+      const preview = url ? await unfurl(url) : null;
+
+      if (preview) {
+        const content: LinkPreviewContent = { text, ...preview };
+        await conversation.send(linkPreviewCodec.encode(content) as any);
+      } else {
+        // No link, or nothing worth showing, or the unfurl host is unreachable —
+        // all the same outcome: a normal text message with a clickable link.
+        await conversation.sendText(text);
+      }
     } catch (e: any) {
       console.error(e);
       setSetupError(e?.message ?? 'Failed to send');
@@ -421,6 +440,22 @@ export function XmtpChat({ recipient, recipientName, conversation: provided, sen
                 disabled={!canSendValue}
                 onClick={() => { setShowActions(false); setComposer('nft'); }}
               />
+              {/* Not gated on canSendValue: sharing a token moves no value and
+                  needs no recipient address, so it works in a group whose
+                  members haven't published one. */}
+              <ActionItem
+                icon={<TrendingUp size={15} />}
+                label="Token"
+                sub="Share with live price"
+                onClick={() => { setShowActions(false); setComposer('token'); }}
+              />
+              <ActionItem
+                icon={<Sparkles size={15} />}
+                label="SOL tip"
+                sub={canSendValue ? 'No platform fee' : 'No recipient yet'}
+                disabled={!canSendValue}
+                onClick={() => { setShowActions(false); setComposer('sol'); }}
+              />
             </div>
           </>
         )}
@@ -489,6 +524,22 @@ export function XmtpChat({ recipient, recipientName, conversation: provided, sen
           onSent={() => setComposer(null)}
         />
       )}
+      {composer === 'token' && (
+        <TokenComposer
+          conversation={conversation}
+          onClose={() => setComposer(null)}
+          onSent={() => setComposer(null)}
+        />
+      )}
+      {composer === 'sol' && (
+        <SolTipComposer
+          conversation={conversation}
+          target={composerTarget}
+          candidates={tipCandidates}
+          onClose={() => setComposer(null)}
+          onSent={() => setComposer(null)}
+        />
+      )}
     </>
   );
 }
@@ -530,8 +581,15 @@ function MessageBubble({ message, fromMe, inGroup, senderAddress, showSender }: 
   if (tip) return <TipCard tip={tip} fromMe={fromMe} senderAddress={senderAddress ?? null} />;
   const nft = asNftSend(message as any);
   if (nft) return <NftCard nft={nft} fromMe={fromMe} senderAddress={senderAddress ?? null} />;
+  const token = asTokenShare(message as any);
+  if (token) return <TokenCard token={token} fromMe={fromMe} />;
+  const solTip = asSolTip(message as any);
+  if (solTip) return <SolTipCard tip={solTip} fromMe={fromMe} />;
 
-  const text = typeof message.content === 'string' ? message.content : null;
+  // A link-preview message is a text message that brought its own card. Read
+  // the text out of it so both shapes flow through the same bubble below.
+  const linkPreview = asLinkPreview(message as any);
+  const text = linkPreview ? linkPreview.text : (typeof message.content === 'string' ? message.content : null);
   const inline = isAttachment(message as any) ? (message.content as Attachment) : null;
   const remote = isRemoteAttachment(message as any) ? (message.content as RemoteAttachment) : null;
 
@@ -541,7 +599,7 @@ function MessageBubble({ message, fromMe, inGroup, senderAddress, showSender }: 
     <div className={`max-w-[85%] sm:max-w-md px-4 py-2.5 rounded-bubble text-sm leading-relaxed break-words ${
       fromMe ? 'bg-bubble-outgoing text-brand-ink' : 'bg-bubble-incoming text-text-primary'
     }`}>
-      {text && <div className="whitespace-pre-wrap">{text}</div>}
+      {text && <MessageText text={text} preview={linkPreview ?? undefined} fromMe={fromMe} />}
       {inline && <InlineImage attachment={inline} />}
       {remote && <RemoteImage remote={remote} />}
       <div className={`text-[10px] mt-1 ${fromMe ? 'text-white/60 text-right' : 'text-text-muted'}`}>
@@ -552,23 +610,32 @@ function MessageBubble({ message, fromMe, inGroup, senderAddress, showSender }: 
 
   if (fromMe) return <div className="flex justify-end">{bubble}</div>;
 
-  // Group mode: gutter reserved for the avatar so a run of messages from the
-  // same person stays aligned under their name.
-  if (inGroup) {
-    return (
-      <div className="flex justify-start gap-2">
-        <div className="w-7 shrink-0">
-          {showSender && <SenderAvatar address={senderAddress ?? null} />}
-        </div>
-        <div className="min-w-0">
-          {showSender && <SenderName address={senderAddress ?? null} inboxId={message.senderInboxId} />}
-          {bubble}
-        </div>
+  // Incoming messages get an avatar gutter in both DMs and groups. In a group
+  // it answers "who said this"; in a DM there's only one possible answer, but
+  // it still gives the thread a face and keeps the two layouts identical.
+  //
+  // The gutter is always reserved and only filled on the first message of a
+  // run, so consecutive messages from one person stay aligned instead of
+  // stepping in and out.
+  //
+  // min-w-0 on the column: it's a flex item wrapping the bubble, so without it
+  // a long unbroken address sets a min-content floor and pushes the row wider
+  // than the screen. See the note in ChatView.
+  return (
+    <div className="flex justify-start gap-2">
+      <div className="w-7 shrink-0">
+        {showSender && <SenderAvatar address={senderAddress ?? null} />}
       </div>
-    );
-  }
-
-  return <div className="flex justify-start">{bubble}</div>;
+      <div className="min-w-0 flex-1">
+        {/* Only groups need the name — in a DM the header already says who
+            you're talking to, and repeating it above every bubble is noise. */}
+        {inGroup && showSender && (
+          <SenderName address={senderAddress ?? null} inboxId={message.senderInboxId} />
+        )}
+        {bubble}
+      </div>
+    </div>
+  );
 }
 
 function SenderAvatar({ address }: { address: `0x${string}` | null }) {
