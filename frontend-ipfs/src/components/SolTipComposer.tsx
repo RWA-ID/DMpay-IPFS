@@ -51,6 +51,7 @@ export function SolTipComposer({ conversation, target, candidates, onClose, onSe
   const [wallet, setWallet] = useState<SolanaWallet | null>(null);
   const [from, setFrom] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
+  const [balanceError, setBalanceError] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
@@ -80,10 +81,17 @@ export function SolTipComposer({ conversation, target, candidates, onClose, onSe
   useEffect(() => {
     if (!from) return;
     let cancelled = false;
+    setBalanceError(null);
     solanaConnection()
       .getBalance(new PublicKey(from))
       .then((lamports) => { if (!cancelled) setBalance(lamportsToSol(lamports)); })
-      .catch(() => { /* a missing balance only costs the "max" shortcut */ });
+      .catch((e) => {
+        // Previously swallowed. That was wrong: when the RPC refuses, the
+        // balance line simply never appears and the first sign of trouble is
+        // the send failing — so say it here, where it can still be acted on.
+        console.error('solana balance lookup failed', e);
+        if (!cancelled) setBalanceError('Could not reach Solana to read your balance.');
+      });
     return () => { cancelled = true; };
   }, [from]);
 
@@ -218,14 +226,16 @@ export function SolTipComposer({ conversation, target, candidates, onClose, onSe
 
               <div className="flex items-baseline justify-between mb-2">
                 <FieldLabel>Amount</FieldLabel>
-                {balance !== null && (
+                {balance !== null ? (
                   <button
-                    onClick={() => setAmount(Math.max(0, balance - 0.00001).toFixed(4))}
+                    onClick={() => setAmount(Math.max(0, balance - 0.00001).toFixed(5))}
                     className="font-mono text-[10px] text-text-faint hover:text-text-secondary"
                   >
-                    Balance {balance.toFixed(4)} SOL
+                    Balance {balance.toFixed(5)} SOL
                   </button>
-                )}
+                ) : balanceError ? (
+                  <span className="font-mono text-[10px] text-danger">{balanceError}</span>
+                ) : null}
               </div>
               <input
                 value={amount}

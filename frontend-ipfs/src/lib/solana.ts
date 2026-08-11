@@ -42,20 +42,70 @@ const SOLANA_ADDRESS_BYTES = 32;
 export const SOL_DECIMALS = 9;
 
 /**
- * Public mainnet RPC.
+ * Mainnet RPC endpoints, tried in order.
  *
- * Called from the user's own browser, not from a Worker — which matters,
- * because shared egress IPs are exactly what gets a Worker throttled on public
- * Solana RPCs. Overridable so a deploy can point at a dedicated endpoint
- * without a code change; leaving it unset is fine for the volume a tip button
- * generates.
+ * **Not `api.mainnet-beta.solana.com`.** That endpoint is Solana Labs' own
+ * node and it answers a browser request from a real deployment with a hard
+ * HTTP 403 "Access forbidden" — it is documented as unsuitable for
+ * applications and is aggressively rate-limited. Using it as the default meant
+ * every SOL tip failed with `failed to get balance of account …: 403`, which
+ * reads like a wallet problem and isn't.
+ *
+ * publicnode is the same provider this app already uses for Ethereum
+ * (`lib/wagmi.ts`), needs no key, and sends `access-control-allow-origin: *` —
+ * which the IPFS build requires, since a key restricted to app.dmpay.me is
+ * useless from a gateway and an unrestricted key in the bundle is a published
+ * key.
+ *
+ * `VITE_SOLANA_RPC` is tried first when set, so a deploy can put a dedicated
+ * endpoint in front without touching this list.
  */
-export const SOLANA_RPC =
-  (import.meta.env.VITE_SOLANA_RPC as string | undefined) || 'https://api.mainnet-beta.solana.com';
+export const SOLANA_RPCS: string[] = [
+  import.meta.env.VITE_SOLANA_RPC as string | undefined,
+  'https://solana-rpc.publicnode.com',
+  // Second free endpoint, verified to answer with `access-control-allow-origin: *`.
+  // One endpoint is not redundancy — a tip that fails because a single public
+  // node is having a bad minute looks identical to a broken feature.
+  'https://solana.leorpc.com/?api_key=FREE',
+].filter((url): url is string => !!url);
+
+export const SOLANA_RPC = SOLANA_RPCS[0];
+
+/**
+ * Try each endpoint until one answers at the transport level.
+ *
+ * Only HTTP-level failures move on. A 200 carrying a JSON-RPC error is the
+ * node *answering* — "account not found" is a real answer, and retrying it
+ * elsewhere would turn one honest response into several pointless round trips.
+ */
+async function fallbackFetch(_input: unknown, init?: RequestInit): Promise<Response> {
+  let lastResponse: Response | null = null;
+  let lastError: unknown = null;
+
+  for (const url of SOLANA_RPCS) {
+    try {
+      const response = await fetch(url, init);
+      if (response.ok) return response;
+      lastResponse = response;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+
+  // Hand back the last real response so web3.js reports the actual status
+  // rather than a generic network failure.
+  if (lastResponse) return lastResponse;
+  throw lastError ?? new Error('No Solana RPC endpoint could be reached');
+}
 
 let connection: Connection | null = null;
 export function solanaConnection(): Connection {
-  if (!connection) connection = new Connection(SOLANA_RPC, 'confirmed');
+  if (!connection) {
+    connection = new Connection(SOLANA_RPC, {
+      commitment: 'confirmed',
+      fetch: fallbackFetch as unknown as typeof fetch,
+    });
+  }
   return connection;
 }
 
