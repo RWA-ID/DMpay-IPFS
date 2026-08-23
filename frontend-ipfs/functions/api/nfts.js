@@ -15,53 +15,19 @@
  * Set OPENSEA_API_KEY in the Pages project (Settings → Environment variables).
  */
 
+import { corsHeaders } from '../_cors.js';
+
 const OPENSEA_BASE = 'https://api.opensea.io/api/v2';
 const MAX_LIMIT = 50;
 
-/**
- * Origins allowed to use this proxy. Deliberately not `*`: an open proxy is a
- * free OpenSea key for anyone who finds the URL, and the rate limit it burns
- * is ours. IPFS gateways are matched by suffix because there are many of them
- * and users pick their own.
- */
-function corsOrigin(request) {
-  const origin = request.headers.get('Origin');
-  if (!origin) return null;
-  let host;
-  try {
-    host = new URL(origin).hostname;
-  } catch {
-    return null;
-  }
-  const allowed =
-    host === 'app.dmpay.me' ||
-    host === 'localhost' ||
-    host === '127.0.0.1' ||
-    host.endsWith('.eth.link') ||
-    host.endsWith('.eth.limo') ||
-    host.endsWith('.ipfs.dweb.link') ||
-    host.endsWith('.ipfs.cf-ipfs.com');
-  return allowed ? origin : null;
-}
-
-function corsHeaders(request) {
-  const origin = corsOrigin(request);
-  const headers = { 'Content-Type': 'application/json' };
-  if (origin) {
-    headers['Access-Control-Allow-Origin'] = origin;
-    headers['Vary'] = 'Origin';
-  }
-  return headers;
-}
-
 const json = (request, body, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: corsHeaders(request) });
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...corsHeaders(request) },
+  });
 
 export async function onRequestOptions({ request }) {
-  return new Response(null, {
-    status: 204,
-    headers: { ...corsHeaders(request), 'Access-Control-Allow-Methods': 'GET, OPTIONS' },
-  });
+  return new Response(null, { status: 204, headers: corsHeaders(request) });
 }
 
 /** ipfs:// and ipns:// URLs can't be loaded by an <img> — rewrite to a gateway. */

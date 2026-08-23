@@ -1,14 +1,20 @@
 #!/usr/bin/env node
-// Pin dist/ directory to Pinata. Reads VITE_PINATA_JWT from .env.
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+// Pin dist/ directory to Pinata. Reads PINATA_JWT from .env.local, else .env.
+//
+// Deliberately NOT VITE_PINATA_JWT: that prefix compiles the value into the
+// browser bundle, and this repo's bundle is pinned to IPFS, which cannot be
+// unpublished. The deploy key this script uses must never carry it. Runtime
+// uploads no longer read a key at all — they go through functions/api/upload.js.
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
 const root = resolve(new URL('..', import.meta.url).pathname);
 const distDir = join(root, 'dist');
 
-// Load .env (no dotenv dep — tiny parse)
+// Load .env (no dotenv dep — tiny parse). Same precedence as deploy.mjs.
+const envPath = existsSync(join(root, '.env.local')) ? join(root, '.env.local') : join(root, '.env');
 const env = Object.fromEntries(
-  readFileSync(join(root, '.env'), 'utf8')
+  readFileSync(envPath, 'utf8')
     .split('\n')
     .filter((l) => l && !l.startsWith('#') && l.includes('='))
     .map((l) => {
@@ -16,8 +22,10 @@ const env = Object.fromEntries(
       return [l.slice(0, i).trim(), l.slice(i + 1).trim()];
     }),
 );
-const JWT = env.VITE_PINATA_JWT;
-if (!JWT) { console.error('VITE_PINATA_JWT missing'); process.exit(1); }
+// Exact key, not a substring match: a leftover VITE_PINATA_JWT must fail loudly
+// here rather than quietly keep the exposed key in service.
+const JWT = env.PINATA_JWT;
+if (!JWT) { console.error(`PINATA_JWT missing from ${relative(root, envPath)}`); process.exit(1); }
 
 function walk(dir) {
   const out = [];

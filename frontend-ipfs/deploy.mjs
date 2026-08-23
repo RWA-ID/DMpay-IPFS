@@ -4,7 +4,11 @@ import { PinataSDK } from 'pinata';
 
 const envFile = fs.existsSync('.env.local') ? '.env.local' : '.env';
 const env = fs.readFileSync(envFile, 'utf8');
-const jwt = env.match(/PINATA_JWT=(.*)/)?.[1]?.trim();
+// Anchored to the line start so this cannot match VITE_PINATA_JWT as a
+// substring. That prefix compiles a key into the browser bundle, the bundle
+// gets pinned to IPFS, and IPFS cannot be unpublished — a deploy key must
+// never be one, and picking one up silently is how it would happen.
+const jwt = env.match(/^PINATA_JWT=(.*)$/m)?.[1]?.trim();
 if (!jwt) {
   console.error('Missing PINATA_JWT in', envFile);
   process.exit(1);
